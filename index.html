@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slitta</title>
+<meta name="theme-color" content="#0f766e">
+<style>
+:root{--bg:#eef3f1;--card:#fff;--ink:#10201c;--mute:#5d716b;--line:#d5e0dc;--brand:#0f766e;--on:#fff;--soft:#d9efea;--warn:#fff1d6;--warnink:#8a4b05;--bad:#b42318}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1715;--card:#15231f;--ink:#e6f1ee;--mute:#92aaa3;--line:#27382f;--brand:#4fd1c0;--on:#06201c;--soft:#1d3a34;--warn:#3a2a0c;--warnink:#f5c06b;--bad:#ff8a7a}}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(90px + env(safe-area-inset-bottom)) env(safe-area-inset-left)}
+main{max-width:680px;margin:0 auto;padding:16px}
+button,input,select{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+h1{margin:8px 0 0;font-size:34px;letter-spacing:-1px}
+#date{margin:0 0 18px;color:var(--mute);text-transform:capitalize}
+h2{font-size:18px;margin:24px 0 8px}
+.btn{border:0;border-radius:12px;padding:10px 16px;background:var(--brand);color:var(--on);font-weight:600}
+.btn.ghost{background:var(--soft);color:var(--brand)}.btn.bad{background:transparent;color:var(--bad)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:8px}
+.row{display:flex;align-items:center;gap:12px}
+.time{min-width:48px;font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums}
+.grow{flex:1;min-width:0;cursor:pointer;overflow-wrap:anywhere}
+.done .t{text-decoration:line-through;color:var(--mute)}
+.sub{font-size:14px;color:var(--mute)}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--brand);flex:none}
+#late{background:var(--warn);border-radius:18px;padding:4px 14px 10px;margin-top:8px}
+#late h2{color:var(--warnink);margin-top:12px}
+.late{border-color:transparent}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px}
+.chip{border:2px solid var(--brand);background:transparent;color:var(--brand);border-radius:12px;padding:8px 12px;font-weight:600;text-align:left}
+.chip small{display:block;font-weight:400;color:var(--mute)}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.day{font-size:14px;color:var(--mute);margin:12px 0 4px;text-transform:capitalize}
+.empty{color:var(--mute);border:1px dashed var(--line);border-radius:14px;padding:18px;text-align:center}
+.bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;padding:12px 12px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line)}
+dialog{border:0;border-radius:18px;padding:20px;width:min(420px,calc(100% - 24px));background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(5,15,12,.55)}
+label{display:block;font-size:14px;color:var(--mute);margin:12px 0 4px}
+input[type=text],input[type=date],input[type=time],select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.two{display:flex;gap:10px}.two>div{flex:1}
+.end{display:flex;gap:8px;margin-top:18px}.end .sp{flex:1}
+</style>
+</head>
+<body>
+<main>
+  <h1>Slitta</h1>
+  <p id="date"></p>
+  <section id="late" hidden aria-live="polite"><h2>Da riprogrammare</h2><div id="lateList"></div></section>
+  <h2>Oggi</h2><div id="todayList"></div>
+  <h2>Prossimi giorni</h2><div id="nextList"></div>
+</main>
+<div class="bar">
+  <button class="btn" id="newBtn">+ Nuovo appuntamento</button>
+  <button class="btn ghost" id="notifBtn"></button>
+</div>
+
+<dialog id="dlg">
+  <form id="form" method="dialog">
+    <h3 id="dlgT" style="margin:0">Nuovo appuntamento</h3>
+    <label for="fT">Cosa devi fare</label><input type="text" id="fT" required maxlength="120">
+    <div class="two">
+      <div><label for="fD">Giorno</label><input type="date" id="fD" required></div>
+      <div><label for="fH">Ora</label><input type="time" id="fH" required></div>
+    </div>
+    <label for="fL">Durata</label>
+    <select id="fL"><option value="15">15 minuti</option><option value="30" selected>30 minuti</option><option value="45">45 minuti</option><option value="60">1 ora</option><option value="90">1 ora e 30</option><option value="120">2 ore</option></select>
+    <div class="end">
+      <button type="button" class="btn bad" id="fDel">Elimina</button><span class="sp"></span>
+      <button type="button" class="btn ghost" id="fNo">Annulla</button>
+      <button type="submit" class="btn">Salva</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const KEY = 'slitta.v1', WORK = [9 * 60, 18 * 60], STEP = 15; // orario in cui propone gli slot: 9:00-18:00
+let items = [];
+try { items = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) { alert('Impossibile salvare i dati in questo browser.'); } };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const p2 = n => String(n).padStart(2, '0');
+const isoD = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+const isoT = d => p2(d.getHours()) + ':' + p2(d.getMinutes());
+const start = i => new Date(i.date + 'T' + i.time);
+const end = i => new Date(+start(i) + (i.dur || 30) * 60000);
+const dayLbl = d => d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+
+// ---- Cerca il primo spazio libero dentro l'orario di lavoro ----
+function overlaps(a, b, exceptId) {
+  return items.some(o => o.status === 'open' && o.id !== exceptId && start(o) < b && end(o) > a);
+}
+function freeFrom(from, dur, exceptId) {
+  const d = new Date(from); d.setSeconds(0, 0);
+  d.setMinutes(Math.ceil(d.getMinutes() / STEP) * STEP);
+  for (let n = 0; n < 14 * 96; n++) {
+    const m = d.getHours() * 60 + d.getMinutes();
+    if (m >= WORK[0] && m + dur <= WORK[1] && !overlaps(d, new Date(+d + dur * 60000), exceptId)) return new Date(d);
+    d.setMinutes(d.getMinutes() + STEP);
+  }
+  return d;
+}
+function suggest(i) {
+  const now = new Date(), soon = new Date(+now + 10 * 60000), dur = i.dur || 30, o = start(i);
+  const tmr = new Date(now); tmr.setDate(tmr.getDate() + 1); tmr.setHours(o.getHours(), o.getMinutes());
+  const wk = new Date(o); wk.setDate(wk.getDate() + 7);
+  const raw = [['Prima occasione', soon], ['Domani', tmr], ['Settimana prossima', wk]];
+  const out = [];
+  for (const [label, from] of raw) {
+    const d = freeFrom(from < soon ? soon : from, dur, i.id);
+    if (!out.some(x => +x.d === +d)) out.push({ label, d });
+  }
+  return out;
+}
+
+// ---- Azioni ----
+function moveTo(i, d) { i.date = isoD(d); i.time = isoT(d); i.moved = (i.moved || 0) + 1; i.n1 = 0; i.n2 = 0; save(); render(); }
+function toggle(i, v) { i.status = v ? 'done' : 'open'; save(); render(); }
+
+// ---- Disegno ----
+function card(i) {
+  const row = el('div', 'card row' + (i.status === 'done' ? ' done' : ''));
+  const cb = el('input'); cb.type = 'checkbox'; cb.checked = i.status === 'done';
+  cb.setAttribute('aria-label', 'Fatto'); cb.onchange = () => toggle(i, cb.checked);
+  const g = el('div', 'grow'); g.tabIndex = 0; g.setAttribute('role', 'button');
+  g.append(el('div', 't', i.title), el('div', 'sub', i.dur + ' min' + (i.moved ? ' · spostato ' + i.moved + (i.moved > 1 ? ' volte' : ' volta') : '')));
+  g.onclick = () => openDlg(i);
+  g.onkeydown = e => { if (e.key === 'Enter') openDlg(i); };
+  row.append(cb, el('div', 'time', i.time), g);
+  return row;
+}
+function lateCard(i) {
+  const c = el('div', 'card late');
+  c.append(el('div', 't', i.title));
+  c.append(el('div', 'sub', 'Era previsto ' + dayLbl(start(i)) + ' alle ' + i.time + (i.moved ? ' · già spostato ' + i.moved + 'x' : '')));
+  const chips = el('div', 'chips');
+  for (const s of suggest(i)) {
+    const b = el('button', 'chip', s.label); b.type = 'button';
+    b.append(el('small', '', dayLbl(s.d) + ' alle ' + isoT(s.d)));
+    b.onclick = () => moveTo(i, s.d);
+    chips.append(b);
+  }
+  const a = el('div', 'acts');
+  const done = el('button', 'btn ghost', 'Fatto'); done.onclick = () => toggle(i, true);
+  const other = el('button', 'btn ghost', 'Scegli tu'); other.onclick = () => openDlg(i);
+  const del = el('button', 'btn bad', 'Elimina'); del.onclick = () => { if (confirm('Eliminare "' + i.title + '"?')) { items = items.filter(x => x.id !== i.id); save(); render(); } };
+  a.append(done, other, del);
+  c.append(chips, a);
+  return c;
+}
+function render() {
+  const now = new Date(), today = isoD(now);
+  $('#date').textContent = now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const byTime = (a, b) => (a.date + a.time).localeCompare(b.date + b.time);
+  const late = items.filter(i => i.status === 'open' && end(i) <= now).sort(byTime);
+  const lateIds = new Set(late.map(i => i.id));
+  const rest = items.filter(i => !lateIds.has(i.id)).sort(byTime);
+  $('#late').hidden = !late.length;
+  $('#lateList').replaceChildren(...late.map(lateCard));
+  document.title = (late.length ? '(' + late.length + ') ' : '') + 'Slitta';
+  const t = rest.filter(i => i.date === today);
+  $('#todayList').replaceChildren(...(t.length ? t.map(card) : [el('div', 'empty', 'Niente in programma per oggi.')]));
+  const nb = $('#nextList'); nb.replaceChildren();
+  const fut = rest.filter(i => i.date > today && i.status === 'open');
+  if (!fut.length) nb.append(el('div', 'empty', 'Nessun appuntamento nei prossimi giorni. Premi "+ Nuovo appuntamento".'));
+  let last = '';
+  for (const i of fut) { if (i.date !== last) { nb.append(el('div', 'day', dayLbl(start(i)))); last = i.date; } nb.append(card(i)); }
+}
+
+// ---- Finestra di modifica ----
+let editId = null;
+function openDlg(i) {
+  editId = i ? i.id : null;
+  $('#dlgT').textContent = i ? 'Modifica appuntamento' : 'Nuovo appuntamento';
+  const d = freeFrom(new Date(+new Date() + 3600000), 30);
+  $('#fT').value = i ? i.title : '';
+  $('#fD').value = i ? i.date : isoD(d);
+  $('#fH').value = i ? i.time : isoT(d);
+  $('#fL').value = i ? i.dur : 30;
+  $('#fDel').style.display = i ? '' : 'none';
+  $('#dlg').showModal(); $('#fT').focus();
+}
+$('#newBtn').onclick = () => openDlg(null);
+$('#fNo').onclick = () => $('#dlg').close();
+$('#fDel').onclick = () => { if (!confirm('Eliminare questo appuntamento?')) return; items = items.filter(x => x.id !== editId); save(); $('#dlg').close(); render(); };
+$('#form').onsubmit = e => {
+  const data = { title: $('#fT').value.trim(), date: $('#fD').value, time: $('#fH').value, dur: +$('#fL').value };
+  if (!data.title || !data.date || !data.time) return;
+  const a = new Date(data.date + 'T' + data.time), b = new Date(+a + data.dur * 60000);
+  const clash = items.find(o => o.status === 'open' && o.id !== editId && start(o) < b && end(o) > a);
+  if (clash && !confirm('Si sovrappone a "' + clash.title + '". Salvare lo stesso?')) { e.preventDefault(); return; }
+  if (editId) { const i = items.find(x => x.id === editId); if (i.date !== data.date || i.time !== data.time) { i.n1 = 0; i.n2 = 0; } Object.assign(i, data); }
+  else items.push({ id: uid(), status: 'open', moved: 0, ...data });
+  save(); render();
+};
+
+// ---- Avvisi (funzionano mentre l'app è aperta o in background nel browser) ----
+function notify(t, b) { if ('Notification' in window && Notification.permission === 'granted') { try { new Notification(t, { body: b }); } catch (e) {} } }
+function notifLabel() {
+  const ok = 'Notification' in window;
+  $('#notifBtn').textContent = !ok ? 'Avvisi non supportati' : Notification.permission === 'granted' ? 'Avvisi attivi' : 'Attiva avvisi';
+  $('#notifBtn').disabled = !ok || Notification.permission === 'granted';
+}
+$('#notifBtn').onclick = () => Notification.requestPermission().then(notifLabel);
+function tick() {
+  const now = new Date(); let ch = false;
+  for (const i of items) {
+    if (i.status !== 'open') continue;
+    if (!i.n1 && start(i) <= now && end(i) > now) { notify('Ora: ' + i.title, 'Inizia adesso'); i.n1 = 1; ch = true; }
+    if (!i.n2 && end(i) <= now) { notify('Non fatto: ' + i.title, 'Apri Slitta per riprogrammarlo'); i.n2 = 1; ch = true; }
+  }
+  if (ch) save();
+  render();
+}
+setInterval(tick, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+notifLabel(); tick();
+</script>
+</body>
+</html>
