@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Slitta</title>
 <meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
 <style>
 :root{--bg:#eef3f1;--card:#fff;--ink:#10201c;--mute:#5d716b;--line:#d5e0dc;--brand:#0f766e;--on:#fff;--soft:#d9efea;--warn:#fff1d6;--warnink:#8a4b05;--bad:#b42318}
 @media(prefers-color-scheme:dark){:root{--bg:#0d1715;--card:#15231f;--ink:#e6f1ee;--mute:#92aaa3;--line:#27382f;--brand:#4fd1c0;--on:#06201c;--soft:#1d3a34;--warn:#3a2a0c;--warnink:#f5c06b;--bad:#ff8a7a}}
@@ -34,6 +39,7 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--brand);flex:none}
 .acts{display:flex;gap:6px;flex-wrap:wrap}
 .day{font-size:14px;color:var(--mute);margin:12px 0 4px;text-transform:capitalize}
 .empty{color:var(--mute);border:1px dashed var(--line);border-radius:14px;padding:18px;text-align:center}
+.bar{flex-wrap:wrap}
 .bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;padding:12px 12px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line)}
 dialog{border:0;border-radius:18px;padding:20px;width:min(420px,calc(100% - 24px));background:var(--card);color:var(--ink)}
 dialog::backdrop{background:rgba(5,15,12,.55)}
@@ -54,6 +60,7 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
 <div class="bar">
   <button class="btn" id="newBtn">+ Nuovo appuntamento</button>
   <button class="btn ghost" id="notifBtn"></button>
+  <button class="btn ghost" id="cfgBtn" aria-label="Impostazioni">⚙️</button>
 </div>
 
 <dialog id="dlg">
@@ -74,9 +81,34 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
   </form>
 </dialog>
 
+<dialog id="cfgDlg">
+  <form id="cfgForm" method="dialog">
+    <h3 style="margin:0">Impostazioni</h3>
+    <p class="sub">Slitta propone i nuovi orari solo dentro questa fascia.</p>
+    <div class="two">
+      <div><label for="cS">Inizio giornata</label><input type="time" id="cS" required></div>
+      <div><label for="cE">Fine giornata</label><input type="time" id="cE" required></div>
+    </div>
+    <h4 style="margin:20px 0 4px">Backup</h4>
+    <p class="sub">I dati restano su questo dispositivo. Scarica un file per non perderli o per spostarli.</p>
+    <div class="acts">
+      <button type="button" class="btn ghost" id="expBtn">Scarica backup</button>
+      <button type="button" class="btn ghost" id="impBtn">Ripristina da file</button>
+      <input type="file" id="impFile" accept="application/json" hidden>
+    </div>
+    <p class="sub" id="cfgMsg" role="status"></p>
+    <div class="end"><span class="sp"></span>
+      <button type="button" class="btn ghost" id="cNo">Chiudi</button>
+      <button type="submit" class="btn">Salva</button>
+    </div>
+  </form>
+</dialog>
+
 <script>
 const $ = s => document.querySelector(s);
-const KEY = 'slitta.v1', WORK = [9 * 60, 18 * 60], STEP = 15; // orario in cui propone gli slot: 9:00-18:00
+const KEY = 'slitta.v1', CFG = 'slitta.cfg', STEP = 15;
+let WORK = [9 * 60, 18 * 60]; // fascia in cui propone gli spostamenti (modificabile dalle impostazioni)
+try { const c = JSON.parse(localStorage.getItem(CFG) || 'null'); if (c && c.s < c.e) WORK = [c.s, c.e]; } catch (e) {}
 let items = [];
 try { items = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) { alert('Impossibile salvare i dati in questo browser.'); } };
@@ -175,7 +207,7 @@ let editId = null;
 function openDlg(i) {
   editId = i ? i.id : null;
   $('#dlgT').textContent = i ? 'Modifica appuntamento' : 'Nuovo appuntamento';
-  const d = freeFrom(new Date(+new Date() + 3600000), 30);
+  const d = new Date(); d.setSeconds(0, 0); d.setMinutes(Math.ceil((d.getMinutes() + 1) / STEP) * STEP);
   $('#fT').value = i ? i.title : '';
   $('#fD').value = i ? i.date : isoD(d);
   $('#fH').value = i ? i.time : isoT(d);
@@ -195,6 +227,37 @@ $('#form').onsubmit = e => {
   if (editId) { const i = items.find(x => x.id === editId); if (i.date !== data.date || i.time !== data.time) { i.n1 = 0; i.n2 = 0; } Object.assign(i, data); }
   else items.push({ id: uid(), status: 'open', moved: 0, ...data });
   save(); render();
+};
+
+// ---- Impostazioni e backup ----
+const toMin = t => { const [a, b] = t.split(':').map(Number); return a * 60 + b; };
+const fromMin = m => p2(Math.floor(m / 60)) + ':' + p2(m % 60);
+$('#cfgBtn').onclick = () => { $('#cS').value = fromMin(WORK[0]); $('#cE').value = fromMin(WORK[1]); $('#cfgMsg').textContent = ''; $('#cfgDlg').showModal(); };
+$('#cNo').onclick = () => $('#cfgDlg').close();
+$('#cfgForm').onsubmit = e => {
+  const a = toMin($('#cS').value), b = toMin($('#cE').value);
+  if (a >= b) { e.preventDefault(); $('#cfgMsg').textContent = 'La fine della giornata deve essere dopo l\'inizio.'; return; }
+  WORK = [a, b];
+  try { localStorage.setItem(CFG, JSON.stringify({ s: a, e: b })); } catch (x) {}
+  render();
+};
+$('#expBtn').onclick = () => {
+  const blob = new Blob([JSON.stringify({ items, work: WORK }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'slitta-backup-' + isoD(new Date()) + '.json'; a.click(); URL.revokeObjectURL(a.href);
+  $('#cfgMsg').textContent = 'Backup scaricato.';
+};
+$('#impBtn').onclick = () => $('#impFile').click();
+$('#impFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!Array.isArray(d.items)) throw 0;
+    if (!confirm('Questo sostituirà gli appuntamenti attuali. Continuare?')) return;
+    items = d.items.filter(i => i && i.title && i.date && i.time).map(i => ({ id: i.id || uid(), status: i.status === 'done' ? 'done' : 'open', moved: i.moved || 0, dur: i.dur || 30, title: i.title, date: i.date, time: i.time }));
+    save(); render(); $('#cfgMsg').textContent = 'Ripristinati ' + items.length + ' appuntamenti.';
+  } catch (x) { $('#cfgMsg').textContent = 'File non valido: scegli un backup creato da Slitta.'; }
+  e.target.value = '';
 };
 
 // ---- Avvisi (funzionano mentre l'app è aperta o in background nel browser) ----
@@ -218,6 +281,7 @@ function tick() {
 setInterval(tick, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 notifLabel(); tick();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
 </html>
