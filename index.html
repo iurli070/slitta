@@ -11,9 +11,10 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
 <style>
-:root{--bg:#eef3f1;--card:#fff;--ink:#10201c;--mute:#5d716b;--line:#d5e0dc;--brand:#0f766e;--on:#fff;--soft:#d9efea;--warn:#fff1d6;--warnink:#8a4b05;--bad:#b42318}
-@media(prefers-color-scheme:dark){:root{--bg:#0d1715;--card:#15231f;--ink:#e6f1ee;--mute:#92aaa3;--line:#27382f;--brand:#4fd1c0;--on:#06201c;--soft:#1d3a34;--warn:#3a2a0c;--warnink:#f5c06b;--bad:#ff8a7a}}
+:root{--c-lavoro:#4338ca;--c-fitness:#c2410c;--c-personale:#475569;--bg:#eef3f1;--card:#fff;--ink:#10201c;--mute:#5d716b;--line:#d5e0dc;--brand:#0f766e;--on:#fff;--soft:#d9efea;--warn:#fff1d6;--warnink:#8a4b05;--bad:#b42318}
+@media(prefers-color-scheme:dark){:root{--c-lavoro:#a5b4fc;--c-fitness:#fdba74;--c-personale:#cbd5e1;--bg:#0d1715;--card:#15231f;--ink:#e6f1ee;--mute:#92aaa3;--line:#27382f;--brand:#4fd1c0;--on:#06201c;--soft:#1d3a34;--warn:#3a2a0c;--warnink:#f5c06b;--bad:#ff8a7a}}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);padding:env(safe-area-inset-top) env(safe-area-inset-right) calc(90px + env(safe-area-inset-bottom)) env(safe-area-inset-left)}
 main{max-width:680px;margin:0 auto;padding:16px}
 button,input,select{font:inherit;color:inherit}button{cursor:pointer}
@@ -74,6 +75,22 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
 .dots{display:flex;gap:2px;height:6px}.dots i{width:6px;height:6px;border-radius:50%;background:var(--brand)}
 .cell.sel .dots i{background:var(--on)}
 #dayTitle{text-transform:capitalize}
+.c-lavoro{--c:var(--c-lavoro)}.c-fitness{--c:var(--c-fitness)}.c-personale{--c:var(--c-personale)}
+.card.c-lavoro,.card.c-fitness,.card.c-personale{border-left:5px solid var(--c)}
+.tag{font-weight:700;color:var(--c)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.fchip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-weight:600;font-size:14px}
+.wh{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 12px}
+.wh .big{font-size:20px;font-weight:700}
+.wh .row2{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.wh .days{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.wh .days label{display:flex;margin:0;gap:4px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:5px 10px;font-size:14px;color:var(--text)}
+.mode{font-weight:600}
+.fchip[aria-pressed=true]{background:var(--brand);color:var(--on);border-color:var(--brand)}
+.d{width:9px;height:9px;border-radius:50%;background:var(--c);display:inline-block}
+.fchip[aria-pressed=true] .d{box-shadow:0 0 0 2px var(--on)}
+.shopx{border:0;background:transparent;color:var(--mute);font-size:18px;width:40px;height:40px}
+.plus{font-weight:700}
 </style>
 </head>
 <body>
@@ -84,6 +101,15 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
   <div class="tabs" role="tablist">
     <button type="button" role="tab" id="tList" aria-selected="true">Lista</button>
     <button type="button" role="tab" id="tMonth" aria-selected="false">Mese</button>
+    <button type="button" role="tab" id="tWork" aria-selected="false">Lavoro</button>
+    <button type="button" role="tab" id="tShop" aria-selected="false">Spesa</button>
+  </div>
+
+  <div class="filters" id="filters" role="group" aria-label="Filtra per categoria">
+    <button type="button" class="fchip" data-f="all" aria-pressed="true">Tutti</button>
+    <button type="button" class="fchip" data-f="lavoro" aria-pressed="false"><i class="d c-lavoro"></i>Lavoro</button>
+    <button type="button" class="fchip" data-f="fitness" aria-pressed="false"><i class="d c-fitness"></i>Fitness</button>
+    <button type="button" class="fchip" data-f="personale" aria-pressed="false"><i class="d c-personale"></i>Personale</button>
   </div>
 
   <div id="viewList">
@@ -105,6 +131,44 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
     <div class="grid" id="calendar"></div>
     <h2 id="dayTitle"></h2>
     <div id="dayList"></div>
+  </div>
+
+  <div id="viewWork" hidden>
+    <section class="wh" aria-label="Orario di lavoro">
+      <div class="row2"><div><div class="sub">Il tuo orario di lavoro</div><div class="big" id="whText"></div></div>
+        <button type="button" class="btn ghost" id="whEdit">Modifica</button></div>
+      <p class="sub" id="whToday" style="margin:8px 0 0"></p>
+      <form id="whForm" hidden>
+        <div class="two"><div><label for="whS">Inizio</label><input type="time" id="whS" required></div>
+        <div><label for="whE">Fine</label><input type="time" id="whE" required></div></div>
+        <div class="days" id="whDays"></div>
+        <p class="sub" id="whMsg" role="status"></p>
+        <div class="acts"><button type="submit" class="btn">Salva orario</button><button type="button" class="btn ghost" id="whNo">Annulla</button></div>
+      </form>
+    </section>
+    <p class="sub" style="margin:0 0 4px">Riunioni e impegni di lavoro, in presenza o da remoto. Se ne salti uno, ti propongo un nuovo orario dentro il tuo orario di lavoro.</p>
+    <div id="workList"></div>
+  </div>
+
+  <div id="viewShop" hidden>
+    <form class="quick" id="shopForm">
+      <input type="text" id="shopInput" list="shopMem" placeholder="Es. latte, pane…" aria-label="Nuovo prodotto" autocomplete="off">
+      <datalist id="shopMem"></datalist>
+      <button class="btn" type="submit">Aggiungi</button>
+    </form>
+    <p class="sub" id="shopMsg" role="status"></p>
+    <div id="recentWrap" hidden>
+      <h2>Acquistati di recente</h2>
+      <p class="sub" style="margin:0">Tocca per rimetterli in lista.</p>
+      <div class="chips" id="recent"></div>
+    </div>
+    <h2>Da comprare</h2>
+    <div id="shopList"></div>
+    <div id="shopDoneWrap" hidden>
+      <div class="mhead" style="margin-top:20px"><h2 id="shopDoneT" style="margin:0">Presi</h2><button type="button" class="btn ghost" id="shopRemoveDone">Rimuovi presi</button></div>
+      <div id="shopDone"></div>
+    </div>
+    <p><button type="button" class="btn bad" id="shopClear">Svuota la memoria dei prodotti</button></p>
   </div>
 </main>
 <div id="toast" role="status" aria-live="polite" hidden></div>
@@ -128,6 +192,10 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
       <div><label for="fR">Ripeti</label>
         <select id="fR"><option value="none">Mai</option><option value="daily">Ogni giorno</option><option value="weekdays">Giorni feriali</option><option value="weekly">Ogni settimana</option><option value="monthly">Ogni mese</option></select></div>
     </div>
+    <label for="fC">Categoria</label>
+    <select id="fC"><option value="lavoro">Lavoro</option><option value="fitness">Fitness</option><option value="personale">Personale</option></select>
+    <div id="fMw"><label for="fM">Dove</label>
+    <select id="fM"><option value="">Non specificato</option><option value="presenza">In presenza</option><option value="remoto">Da remoto</option></select></div>
     <div class="end">
       <button type="button" class="btn bad" id="fDel">Elimina</button><span class="sp"></span>
       <button type="button" class="btn ghost" id="fNo">Annulla</button>
@@ -185,6 +253,13 @@ const KEY = 'slitta.v1', CFG = 'slitta.cfg', STEP = 15;
 let WORK = [9 * 60, 18 * 60]; // fascia in cui propone gli spostamenti (modificabile dalle impostazioni)
 let NAG = true;               // ripete l'avviso finché non confermi
 try { const c = JSON.parse(localStorage.getItem(CFG) || 'null'); if (c && c.s < c.e) WORK = [c.s, c.e]; if (c && c.nag === false) NAG = false; } catch (e) {}
+// Orario di lavoro (sezione Lavoro): usato per proporre nuovi orari agli impegni di lavoro
+let WH = { s: 9 * 60, e: 18 * 60, days: [1, 2, 3, 4, 5] };
+const WHK = 'slitta.work';
+const validWH = w => w && Number.isInteger(w.s) && Number.isInteger(w.e) && w.s < w.e && Array.isArray(w.days) && w.days.length && w.days.every(d => Number.isInteger(d) && d >= 0 && d <= 6);
+try { const w = JSON.parse(localStorage.getItem(WHK) || 'null'); if (validWH(w)) WH = w; } catch (e) {}
+const saveWH = () => { try { localStorage.setItem(WHK, JSON.stringify(WH)); } catch (e) {} };
+const MODES = { presenza: 'In presenza', remoto: 'Da remoto' };
 let items = [];
 try { items = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) { alert('Impossibile salvare i dati in questo browser.'); } };
@@ -201,16 +276,24 @@ const byTime = (a, b) => (a.date + a.time).localeCompare(b.date + b.time);
 const toMin = t => { const [a, b] = t.split(':').map(Number); return a * 60 + b; };
 const fromMin = m => p2(Math.floor(m / 60)) + ':' + p2(m % 60);
 
+// ---- Categorie: solo un'etichetta con colore e un filtro, nessuna regola diversa per ciascuna ----
+const CATS = { lavoro: 'Lavoro', fitness: 'Fitness', personale: 'Personale' };
+const catOf = i => (CATS[i.cat] ? i.cat : 'personale');
+let flt = 'all';
+try { const f = localStorage.getItem('slitta.flt'); if (f === 'all' || CATS[f]) flt = f; } catch (e) {}
+const vis = i => flt === 'all' || catOf(i) === flt;
+
 // ---- Cerca il primo spazio libero dentro l'orario di lavoro ----
 function overlaps(a, b, exceptId) {
   return items.some(o => o.status === 'open' && o.id !== exceptId && start(o) < b && end(o) > a);
 }
-function freeFrom(from, dur, exceptId) {
+function freeFrom(from, dur, exceptId, cat) {
+  const w = cat === 'lavoro' ? WH : { s: WORK[0], e: WORK[1], days: null };
   const d = new Date(from); d.setSeconds(0, 0);
   d.setMinutes(Math.ceil(d.getMinutes() / STEP) * STEP);
   for (let n = 0; n < 14 * 96; n++) {
     const m = d.getHours() * 60 + d.getMinutes();
-    if (m >= WORK[0] && m + dur <= WORK[1] && !overlaps(d, new Date(+d + dur * 60000), exceptId)) return new Date(d);
+    if (m >= w.s && m + dur <= w.e && (!w.days || w.days.includes(d.getDay())) && !overlaps(d, new Date(+d + dur * 60000), exceptId)) return new Date(d);
     d.setMinutes(d.getMinutes() + STEP);
   }
   return d;
@@ -222,7 +305,7 @@ function suggest(i) {
   const raw = [['Prima occasione', soon], ['Domani', tmr], ['Settimana prossima', wk]];
   const out = [];
   for (const [label, from] of raw) {
-    const d = freeFrom(from < soon ? soon : from, dur, i.id);
+    const d = freeFrom(from < soon ? soon : from, dur, i.id, catOf(i));
     if (!out.some(x => +x.d === +d)) out.push({ label, d });
   }
   return out;
@@ -249,7 +332,7 @@ function spawnNext(i) {
   const today = parseD(isoD(new Date()));
   let d = nextDate(parseD(i.date), i.rep, i.rday);
   for (let k = 0; k < 800 && d < today; k++) d = nextDate(d, i.rep, i.rday);
-  const n = { id: uid(), status: 'open', moved: 0, title: i.title, date: isoD(d), time: i.time, dur: i.dur, rep: i.rep, sid: i.sid || i.id, rday: i.rday };
+  const n = { id: uid(), status: 'open', moved: 0, title: i.title, date: isoD(d), time: i.time, dur: i.dur, rep: i.rep, sid: i.sid || i.id, rday: i.rday, cat: i.cat, mode: i.mode };
   armReminders(n); items.push(n); i.nx = n.id;
   return n;
 }
@@ -284,21 +367,32 @@ $('#delOne').onclick = () => { const i = delTarget; if (i) { spawnNext(i); items
 $('#delAll').onclick = () => { const i = delTarget; if (i) { const sid = i.sid || i.id; items = items.filter(x => (x.sid || x.id) !== sid || x.status !== 'open'); save(); } $('#delDlg').close(); render(); };
 
 // ---- Disegno ----
+const outsideWH = i => {
+  if (catOf(i) !== 'lavoro') return false;
+  const m = toMin(i.time), d = start(i).getDay();
+  return !WH.days.includes(d) || m < WH.s || m + (i.dur || 30) > WH.e;
+};
 function card(i) {
-  const row = el('div', 'card row' + (i.status === 'done' ? ' done' : ''));
+  const row = el('div', 'card row c-' + catOf(i) + (i.status === 'done' ? ' done' : ''));
   const cb = el('input'); cb.type = 'checkbox'; cb.checked = i.status === 'done';
   cb.setAttribute('aria-label', 'Fatto'); cb.onchange = () => toggle(i, cb.checked);
   const g = el('div', 'grow'); g.tabIndex = 0; g.setAttribute('role', 'button');
-  g.append(el('div', 't', i.title), el('div', 'sub', i.dur + ' min' + (isRep(i) ? ' · 🔁 ' + REPS[i.rep] : '') + (i.moved ? ' · spostato ' + i.moved + (i.moved > 1 ? ' volte' : ' volta') : '')));
+  const sub = el('div', 'sub');
+  sub.append(el('span', 'tag', CATS[catOf(i)]), (MODES[i.mode] && catOf(i) === 'lavoro' ? ' · ' : ''));
+  if (MODES[i.mode] && catOf(i) === 'lavoro') sub.append(el('span', 'mode', (i.mode === 'remoto' ? '💻 ' : '🏢 ') + MODES[i.mode]));
+  sub.append(' · ' + i.dur + ' min' + (outsideWH(i) ? ' · fuori orario di lavoro' : '') + (isRep(i) ? ' · 🔁 ' + REPS[i.rep] : '') + (i.moved ? ' · spostato ' + i.moved + (i.moved > 1 ? ' volte' : ' volta') : ''));
+  g.append(el('div', 't', i.title), sub);
   g.onclick = () => openDlg(i);
   g.onkeydown = e => { if (e.key === 'Enter') openDlg(i); };
   row.append(cb, el('div', 'time', i.time), g);
   return row;
 }
 function lateCard(i) {
-  const c = el('div', 'card late');
+  const c = el('div', 'card late c-' + catOf(i));
   c.append(el('div', 't', i.title));
-  c.append(el('div', 'sub', 'Era previsto ' + dayLbl(start(i)) + ' alle ' + i.time + (isRep(i) ? ' · 🔁 ' + REPS[i.rep] : '') + (i.moved ? ' · già spostato ' + i.moved + 'x' : '')));
+  const sb = el('div', 'sub');
+  sb.append(el('span', 'tag', CATS[catOf(i)]), ' · Era previsto ' + dayLbl(start(i)) + ' alle ' + i.time + (isRep(i) ? ' · 🔁 ' + REPS[i.rep] : '') + (i.moved ? ' · già spostato ' + i.moved + 'x' : ''));
+  c.append(sb);
   if ((i.moved || 0) >= 3) c.append(el('div', 'hintwarn', 'Spostato ' + i.moved + ' volte. Vale ancora la pena? Puoi eliminarlo oppure dividerlo in passi più piccoli.'));
   const chips = el('div', 'chips');
   for (const s of suggest(i)) {
@@ -330,24 +424,70 @@ function render() {
   $('#remind').replaceChildren(...pend.map(i => remBanner(i, now)));
   const nAlert = late.length + pend.length;
   document.title = (nAlert ? '(' + nAlert + ') ' : '') + 'Slitta';
-  const t = rest.filter(i => i.date === today && i.status === 'open');
-  const doneToday = rest.some(i => i.date === today && i.status === 'done');
-  $('#todayList').replaceChildren(...(t.length ? t.map(card) : [el('div', 'empty', doneToday ? 'Tutto fatto per oggi.' : 'Niente in programma per oggi.')]));
+  renderFilters();
+  const t = rest.filter(i => i.date === today && i.status === 'open' && vis(i));
+  const doneToday = rest.some(i => i.date === today && i.status === 'done' && vis(i));
+  const none = flt === 'all' ? 'Niente in programma per oggi.' : 'Niente in "' + CATS[flt] + '" per oggi.';
+  $('#todayList').replaceChildren(...(t.length ? t.map(card) : [el('div', 'empty', doneToday ? 'Tutto fatto per oggi.' : none)]));
   const nb = $('#nextList'); nb.replaceChildren();
-  const fut = rest.filter(i => i.date > today && i.status === 'open');
+  const fut = rest.filter(i => i.date > today && i.status === 'open' && vis(i));
   if (!fut.length) nb.append(el('div', 'empty', 'Nessun appuntamento nei prossimi giorni. Premi "+ Nuovo appuntamento".'));
   let last = '';
   for (const i of fut) { if (i.date !== last) { nb.append(el('div', 'day', dayLbl(start(i)))); last = i.date; } nb.append(card(i)); }
   if (view === 'month') renderMonth();
+  if (view === 'shop') renderShop();
+  if (view === 'work') renderWork();
 }
+// ---- Sezione Lavoro ----
+const DAYN = [['Lun', 1], ['Mar', 2], ['Mer', 3], ['Gio', 4], ['Ven', 5], ['Sab', 6], ['Dom', 0]];
+function daysText(days) {
+  const set = DAYN.filter(x => days.includes(x[1]));
+  if (set.length === 7) return 'Ogni giorno';
+  if (set.length === 5 && set.every(x => x[1] >= 1 && x[1] <= 5)) return 'Lun–Ven';
+  return set.map(x => x[0]).join(', ');
+}
+function renderWork() {
+  $('#whText').textContent = fromMin(WH.s) + ' – ' + fromMin(WH.e) + ' · ' + daysText(WH.days);
+  const now = new Date(), today = isoD(now);
+  const list = items.filter(i => i.status === 'open' && catOf(i) === 'lavoro' && i.date >= today && end(i) > now).sort(byTime);
+  const todayN = list.filter(i => i.date === today).length;
+  $('#whToday').textContent = WH.days.includes(now.getDay())
+    ? 'Oggi lavori dalle ' + fromMin(WH.s) + ' alle ' + fromMin(WH.e) + (todayN ? ' · ' + todayN + (todayN > 1 ? ' impegni' : ' impegno') + ' in agenda.' : ' · nessun impegno in agenda.')
+    : 'Oggi non lavori.' + (todayN ? ' Hai ' + todayN + (todayN > 1 ? ' impegni' : ' impegno') + ' in agenda.' : '');
+  const box = $('#workList'); box.replaceChildren();
+  if (!list.length) { box.append(el('div', 'empty', 'Nessun impegno di lavoro in programma. Premi "+ Nuovo appuntamento" per aggiungere una riunione.')); return; }
+  let last = '';
+  for (const i of list) { if (i.date !== last) { box.append(el('div', 'day', i.date === today ? 'Oggi' : dayLbl(start(i)))); last = i.date; } box.append(card(i)); }
+}
+function buildDays() {
+  const b = $('#whDays'); b.replaceChildren();
+  for (const [n, v] of DAYN) {
+    const l = el('label'); const c = el('input'); c.type = 'checkbox'; c.value = v; c.checked = WH.days.includes(v);
+    l.append(c, n); b.append(l);
+  }
+}
+$('#whEdit').onclick = () => { $('#whS').value = fromMin(WH.s); $('#whE').value = fromMin(WH.e); buildDays(); $('#whMsg').textContent = ''; $('#whForm').hidden = false; $('#whEdit').hidden = true; };
+$('#whNo').onclick = () => { $('#whForm').hidden = true; $('#whEdit').hidden = false; };
+$('#whForm').onsubmit = e => {
+  e.preventDefault();
+  const a = toMin($('#whS').value), b = toMin($('#whE').value);
+  const days = [...document.querySelectorAll('#whDays input:checked')].map(c => +c.value);
+  if (a >= b) { $('#whMsg').textContent = 'La fine deve essere dopo l\'inizio.'; return; }
+  if (!days.length) { $('#whMsg').textContent = 'Scegli almeno un giorno.'; return; }
+  WH = { s: a, e: b, days }; saveWH();
+  $('#whForm').hidden = true; $('#whEdit').hidden = false; render();
+};
+function renderFilters() { document.querySelectorAll('#filters .fchip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === flt))); }
+document.querySelectorAll('#filters .fchip').forEach(b => { b.onclick = () => { flt = b.dataset.f; try { localStorage.setItem('slitta.flt', flt); } catch (e) {} render(); }; });
 
 // ---- Calendario mensile ----
 let view = 'list', mon = new Date(), selDay = isoD(new Date());
 mon = new Date(mon.getFullYear(), mon.getMonth(), 1);
 function setView(v) {
   view = v;
-  $('#viewList').hidden = v !== 'list'; $('#viewMonth').hidden = v !== 'month';
-  $('#tList').setAttribute('aria-selected', String(v === 'list')); $('#tMonth').setAttribute('aria-selected', String(v === 'month'));
+  $('#viewList').hidden = v !== 'list'; $('#viewMonth').hidden = v !== 'month'; $('#viewShop').hidden = v !== 'shop'; $('#viewWork').hidden = v !== 'work';
+  $('#filters').hidden = v === 'shop' || v === 'work'; $('#newBtn').hidden = v === 'shop';
+  for (const [id, n] of [['#tList', 'list'], ['#tMonth', 'month'], ['#tWork', 'work'], ['#tShop', 'shop']]) $(id).setAttribute('aria-selected', String(v === n));
   render();
 }
 function renderMonth() {
@@ -356,7 +496,7 @@ function renderMonth() {
   ['L', 'M', 'M', 'G', 'V', 'S', 'D'].forEach(x => g.append(el('div', 'dow', x)));
   const first = new Date(mon.getFullYear(), mon.getMonth(), 1);
   const st = new Date(first); st.setDate(1 - (first.getDay() + 6) % 7);
-  const cnt = {}; items.forEach(i => { if (i.status === 'open') cnt[i.date] = (cnt[i.date] || 0) + 1; });
+  const cnt = {}; items.forEach(i => { if (i.status === 'open' && vis(i)) cnt[i.date] = (cnt[i.date] || 0) + 1; });
   const tIso = isoD(new Date());
   for (let n = 0; n < 42; n++) {
     const d = new Date(st); d.setDate(st.getDate() + n); const s = isoD(d);
@@ -368,11 +508,13 @@ function renderMonth() {
     g.append(c);
   }
   $('#dayTitle').textContent = parseD(selDay).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
-  const dl = items.filter(i => i.status === 'open' && i.date === selDay).sort(byTime);
+  const dl = items.filter(i => i.status === 'open' && i.date === selDay && vis(i)).sort(byTime);
   $('#dayList').replaceChildren(...(dl.length ? dl.map(card) : [el('div', 'empty', 'Nessun appuntamento in questo giorno.')]));
 }
 $('#tList').onclick = () => setView('list');
 $('#tMonth').onclick = () => setView('month');
+$('#tShop').onclick = () => setView('shop');
+$('#tWork').onclick = () => setView('work');
 $('#mPrev').onclick = () => { mon = new Date(mon.getFullYear(), mon.getMonth() - 1, 1); renderMonth(); };
 $('#mNext').onclick = () => { mon = new Date(mon.getFullYear(), mon.getMonth() + 1, 1); renderMonth(); };
 
@@ -380,6 +522,12 @@ $('#mNext').onclick = () => { mon = new Date(mon.getFullYear(), mon.getMonth() +
 const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 const DOWS = { domenica: 0, lunedi: 1, 'lunedì': 1, martedi: 2, 'martedì': 2, mercoledi: 3, 'mercoledì': 3, giovedi: 4, 'giovedì': 4, venerdi: 5, 'venerdì': 5, sabato: 6 };
 const DOW_ALT = Object.keys(DOWS).join('|');
+function inferCat(t) {
+  const s = ' ' + t.toLowerCase() + ' ';
+  if (/\b(palestra|personal trainer|trainer|allenamento|corsa|yoga|pilates|nuoto|fitness|crossfit|tennis|calcetto|bici)\b/.test(s)) return 'fitness';
+  if (/\b(riunione|meeting|call|cliente|ufficio|lavoro|colloquio|presentazione|collega)\b/.test(s)) return 'lavoro';
+  return null;
+}
 function parseQuick(txt, now) {
   let s = ' ' + txt.replace(/\s+/g, ' ').trim() + ' ';
   const out = { title: '', date: null, time: null, dur: null, rep: null };
@@ -444,12 +592,18 @@ function parseQuick(txt, now) {
   for (let k = 0; k < 4; k++) t = t.replace(lead, '').replace(tail, '');
   t = t.replace(/\s+([,.;])/g, '$1').replace(/[,.;]+$/, '').trim();
   out.title = t.charAt(0).toUpperCase() + t.slice(1);
+  const lo = ' ' + txt.toLowerCase() + ' ';
+  if (/\b(da remoto|in remoto|zoom|teams|meet|videochiamata)\b/.test(lo)) out.mode = 'remoto';
+  else if (/\b(in presenza|in sede|in ufficio)\b/.test(lo)) out.mode = 'presenza';
+  out.cat = inferCat(txt) || (out.mode ? 'lavoro' : null);
   return out;
 }
 $('#quickForm').onsubmit = e => {
   e.preventDefault();
   const txt = $('#quick').value.trim(); if (!txt) return;
   const now = new Date(), q = parseQuick(txt, now), pre = { title: q.title || txt };
+  if (q.cat) pre.cat = q.cat; else if (view === 'work') pre.cat = 'lavoro'; else if (flt !== 'all') pre.cat = flt;
+  if (q.mode) pre.mode = q.mode;
   if (q.dur) pre.dur = q.dur;
   if (q.rep) pre.rep = q.rep;
   if (q.date) pre.date = q.date;
@@ -460,9 +614,10 @@ $('#quickForm').onsubmit = e => {
     pre.date = isoD(dd);
   }
   if (pre.date && !pre.time) {
-    const from = new Date(Math.max(+new Date(pre.date + 'T' + fromMin(WORK[0])), +now));
-    const f = freeFrom(from, pre.dur || 30);
-    pre.time = isoD(f) === pre.date ? isoT(f) : fromMin(WORK[0]);
+    const w0 = pre.cat === 'lavoro' ? WH.s : WORK[0];
+    const from = new Date(Math.max(+new Date(pre.date + 'T' + fromMin(w0)), +now));
+    const f = freeFrom(from, pre.dur || 30, undefined, pre.cat);
+    pre.time = isoD(f) === pre.date ? isoT(f) : fromMin(w0);
   }
   $('#quick').value = '';
   openDlg(null, pre);
@@ -479,7 +634,7 @@ function openDlg(i, pre) {
     const f = freeFrom(new Date(selDay + 'T' + fromMin(WORK[0])), 30);
     date = selDay; time = isoD(f) === selDay ? isoT(f) : fromMin(WORK[0]);
   }
-  const src = i || Object.assign({ title: '', date, time, dur: 30, rep: 'none' }, pre || {});
+  const src = i || Object.assign({ title: '', date, time, dur: 30, rep: 'none', cat: view === 'work' ? 'lavoro' : flt !== 'all' ? flt : 'personale' }, pre || {});
   const dur = String(src.dur || 30);
   if (![...$('#fL').options].some(o => o.value === dur)) $('#fL').add(new Option(dur + ' minuti', dur));
   $('#fT').value = src.title;
@@ -487,14 +642,19 @@ function openDlg(i, pre) {
   $('#fH').value = src.time;
   $('#fL').value = dur;
   $('#fR').value = src.rep || 'none';
+  $('#fC').value = catOf(src);
+  $('#fM').value = MODES[src.mode] ? src.mode : '';
+  $('#fMw').hidden = catOf(src) !== 'lavoro';
   $('#fDel').style.display = i ? '' : 'none';
   $('#dlg').showModal(); $('#fT').focus();
 }
+$('#fC').onchange = () => { $('#fMw').hidden = $('#fC').value !== 'lavoro'; };
 $('#newBtn').onclick = () => openDlg(null);
 $('#fNo').onclick = () => $('#dlg').close();
 $('#fDel').onclick = () => { const i = items.find(x => x.id === editId); $('#dlg').close(); if (i) removeItem(i); };
 $('#form').onsubmit = e => {
-  const data = { title: $('#fT').value.trim(), date: $('#fD').value, time: $('#fH').value, dur: +$('#fL').value, rep: $('#fR').value };
+  const data = { title: $('#fT').value.trim(), date: $('#fD').value, time: $('#fH').value, dur: +$('#fL').value, rep: $('#fR').value, cat: $('#fC').value };
+  data.mode = data.cat === 'lavoro' && $('#fM').value ? $('#fM').value : undefined;
   if (!data.title || !data.date || !data.time) return;
   const a = new Date(data.date + 'T' + data.time), b = new Date(+a + data.dur * 60000);
   const clash = items.find(o => o.status === 'open' && o.id !== editId && start(o) < b && end(o) > a);
@@ -528,7 +688,7 @@ function download(name, type, text) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = name; a.click(); URL.revokeObjectURL(a.href);
 }
-$('#expBtn').onclick = () => { download('slitta-backup-' + isoD(new Date()) + '.json', 'application/json', JSON.stringify({ items, work: WORK }, null, 2)); $('#cfgMsg').textContent = 'Backup scaricato.'; };
+$('#expBtn').onclick = () => { download('slitta-backup-' + isoD(new Date()) + '.json', 'application/json', JSON.stringify({ items, work: WORK, wh: WH, shop }, null, 2)); $('#cfgMsg').textContent = 'Backup scaricato.'; };
 $('#impBtn').onclick = () => $('#impFile').click();
 $('#impFile').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
@@ -536,7 +696,9 @@ $('#impFile').onchange = async e => {
     const d = JSON.parse(await f.text());
     if (!Array.isArray(d.items)) throw 0;
     if (!confirm('Questo sostituirà gli appuntamenti attuali. Continuare?')) return;
-    items = d.items.filter(i => i && i.title && i.date && i.time).map(i => ({ id: i.id || uid(), status: i.status === 'done' ? 'done' : 'open', moved: i.moved || 0, dur: i.dur || 30, title: i.title, date: i.date, time: i.time, rep: i.rep || 'none', sid: i.sid, rday: i.rday, nx: i.nx }));
+    items = d.items.filter(i => i && i.title && i.date && i.time).map(i => ({ id: i.id || uid(), status: i.status === 'done' ? 'done' : 'open', moved: i.moved || 0, dur: i.dur || 30, title: i.title, date: i.date, time: i.time, rep: i.rep || 'none', sid: i.sid, rday: i.rday, nx: i.nx, cat: i.cat, mode: MODES[i.mode] ? i.mode : undefined }));
+    if (validWH(d.wh)) { WH = d.wh; saveWH(); }
+    if (d.shop && Array.isArray(d.shop.list)) { shop = { list: d.shop.list.filter(p => p && p.text).map(p => ({ id: p.id || uid(), text: String(p.text), done: !!p.done })), hist: d.shop.hist || {} }; saveShop(); }
     save(); render(); $('#cfgMsg').textContent = 'Ripristinati ' + items.length + ' appuntamenti.';
   } catch (x) { $('#cfgMsg').textContent = 'File non valido: scegli un backup creato da Slitta.'; }
   e.target.value = '';
@@ -555,7 +717,8 @@ function buildIcs() {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
   const rules = { daily: 'FREQ=DAILY', weekdays: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY' };
   for (const i of items.filter(x => x.status === 'open')) {
-    L.push('BEGIN:VEVENT', 'UID:' + i.id + '@slitta', 'DTSTAMP:' + stamp, 'DTSTART:' + icsT(start(i)), 'DTEND:' + icsT(end(i)), 'SUMMARY:' + icsEsc(i.title));
+    L.push('BEGIN:VEVENT', 'UID:' + i.id + '@slitta', 'DTSTAMP:' + stamp, 'DTSTART:' + icsT(start(i)), 'DTEND:' + icsT(end(i)), 'SUMMARY:' + icsEsc(i.title), 'CATEGORIES:' + CATS[catOf(i)]);
+    if (MODES[i.mode] && catOf(i) === 'lavoro') L.push('LOCATION:' + MODES[i.mode]);
     if (rules[i.rep]) L.push('RRULE:' + rules[i.rep]);
     for (const m of LEADS.slice().sort((a, b) => b - a)) L.push('BEGIN:VALARM', 'TRIGGER:-PT' + m + 'M', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEsc(i.title), 'END:VALARM');
     L.push('END:VEVENT');
@@ -569,6 +732,61 @@ $('#icsBtn').onclick = () => {
   download('slitta-calendario.ics', 'text/calendar', buildIcs());
   $('#cfgMsg').textContent = 'File del calendario scaricato (' + n + ' appuntamenti). Aprilo per importarlo.';
 };
+
+// ---- Lista della spesa con memoria dei prodotti acquistati di recente ----
+const SHOP = 'slitta.shop', RECENT_DAYS = 90;
+let shop = { list: [], hist: {} };
+try { const s = JSON.parse(localStorage.getItem(SHOP) || 'null'); if (s && Array.isArray(s.list)) shop = { list: s.list, hist: s.hist || {} }; } catch (e) {}
+const saveShop = () => { try { localStorage.setItem(SHOP, JSON.stringify(shop)); } catch (e) { alert('Impossibile salvare la lista in questo browser.'); } };
+const pname = t => { const n = t.replace(/\s+/g, ' ').trim(); return n.charAt(0).toUpperCase() + n.slice(1); };
+const pkey = t => pname(t).toLowerCase();
+function addProduct(text) {
+  const name = pname(text); if (!name) return 'vuoto';
+  const k = pkey(name), ex = shop.list.find(p => pkey(p.text) === k);
+  if (ex && !ex.done) return 'presente';
+  if (ex) ex.done = false; else shop.list.push({ id: uid(), text: name, done: false });
+  const h = shop.hist[k] || (shop.hist[k] = { name, bought: 0, n: 0 }); h.name = name;
+  saveShop(); renderShop(); return 'ok';
+}
+function buyProduct(p, v) {
+  p.done = v;
+  if (v) { const k = pkey(p.text), h = shop.hist[k] || (shop.hist[k] = { name: p.text, bought: 0, n: 0 }); h.bought = Date.now(); h.n = (h.n || 0) + 1; }
+  saveShop(); renderShop();
+}
+function recentProducts() {
+  const cut = Date.now() - RECENT_DAYS * 86400000;
+  const onList = new Set(shop.list.filter(p => !p.done).map(p => pkey(p.text)));
+  return Object.entries(shop.hist).filter(([k, h]) => h.bought >= cut && !onList.has(k)).sort((a, b) => b[1].bought - a[1].bought).slice(0, 14).map(([k, h]) => h.name);
+}
+function shopRow(p) {
+  const row = el('div', 'card row' + (p.done ? ' done' : ''));
+  const cb = el('input'); cb.type = 'checkbox'; cb.checked = p.done; cb.setAttribute('aria-label', 'Preso'); cb.onchange = () => buyProduct(p, cb.checked);
+  const g = el('div', 'grow t', p.text); g.style.cursor = 'default';
+  const x = el('button', 'shopx', '✕'); x.type = 'button'; x.setAttribute('aria-label', 'Togli ' + p.text);
+  x.onclick = () => { shop.list = shop.list.filter(i => i !== p); saveShop(); renderShop(); };
+  row.append(cb, g, x);
+  return row;
+}
+function renderShop() {
+  $('#shopMem').replaceChildren(...Object.values(shop.hist).map(h => { const o = document.createElement('option'); o.value = h.name; return o; }));
+  const rec = recentProducts();
+  $('#recentWrap').hidden = !rec.length;
+  $('#recent').replaceChildren(...rec.map(n => { const b = el('button', 'chip'); b.type = 'button'; b.append(el('span', 'plus', '+ '), n); b.onclick = () => { addProduct(n); }; return b; }));
+  const open = shop.list.filter(p => !p.done), done = shop.list.filter(p => p.done);
+  $('#shopList').replaceChildren(...(open.length ? open.map(shopRow) : [el('div', 'empty', done.length ? 'Hai preso tutto.' : 'La lista è vuota. Scrivi un prodotto qui sopra o scegli tra quelli acquistati di recente.')]));
+  $('#shopDoneWrap').hidden = !done.length;
+  $('#shopDoneT').textContent = 'Presi (' + done.length + ')';
+  $('#shopDone').replaceChildren(...done.map(shopRow));
+  $('#shopClear').hidden = !Object.keys(shop.hist).length;
+}
+$('#shopForm').onsubmit = e => {
+  e.preventDefault();
+  const v = $('#shopInput').value, r = addProduct(v);
+  $('#shopMsg').textContent = r === 'presente' ? '"' + pname(v) + '" è già in lista.' : '';
+  $('#shopInput').value = '';
+};
+$('#shopRemoveDone').onclick = () => { shop.list = shop.list.filter(p => !p.done); saveShop(); renderShop(); };
+$('#shopClear').onclick = () => { if (confirm("Cancellare la memoria dei prodotti acquistati? La lista attuale non cambia.")) { shop.hist = {}; saveShop(); renderShop(); } };
 
 // ---- Avvisi di sistema ----
 async function notify(title, body, tag) {
