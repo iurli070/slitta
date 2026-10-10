@@ -39,7 +39,7 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--brand);flex:none}
 .acts{display:flex;gap:6px;flex-wrap:wrap}
 .day{font-size:14px;color:var(--mute);margin:12px 0 4px;text-transform:capitalize}
 .empty{color:var(--mute);border:1px dashed var(--line);border-radius:14px;padding:18px;text-align:center}
-.bar{flex-wrap:wrap}
+.bar{gap:6px}.bar .btn{padding:10px 12px;white-space:nowrap}
 .bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;padding:12px 12px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line)}
 dialog{border:0;border-radius:18px;padding:20px;width:min(420px,calc(100% - 24px));background:var(--card);color:var(--ink)}
 dialog::backdrop{background:rgba(5,15,12,.55)}
@@ -47,12 +47,18 @@ label{display:block;font-size:14px;color:var(--mute);margin:12px 0 4px}
 input[type=text],input[type=date],input[type=time],select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
 .two{display:flex;gap:10px}.two>div{flex:1}
 .end{display:flex;gap:8px;margin-top:18px}.end .sp{flex:1}
+#remind{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.rem{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--brand);color:var(--on);border-radius:14px;padding:12px 14px}
+.rem .t{font-weight:700}.rem .sub{color:inherit;opacity:.85}
+.rem .btn{background:var(--on);color:var(--brand)}
+#remList{margin-top:10px}
 </style>
 </head>
 <body>
 <main>
   <h1>Slitta</h1>
   <p id="date"></p>
+  <section id="remind" hidden aria-live="assertive"></section>
   <section id="late" hidden aria-live="polite"><h2>Da riprogrammare</h2><div id="lateList"></div></section>
   <h2>Oggi</h2><div id="todayList"></div>
   <h2>Prossimi giorni</h2><div id="nextList"></div>
@@ -79,6 +85,12 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
       <button type="submit" class="btn">Salva</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="remDlg" aria-labelledby="remT">
+  <h3 id="remT" style="margin:0">Appuntamento in arrivo</h3>
+  <div id="remList"></div>
+  <div class="end"><span class="sp"></span><button type="button" class="btn" id="remOk">Ho visto</button></div>
 </dialog>
 
 <dialog id="cfgDlg">
@@ -149,8 +161,8 @@ function suggest(i) {
 }
 
 // ---- Azioni ----
-function moveTo(i, d) { i.date = isoD(d); i.time = isoT(d); i.moved = (i.moved || 0) + 1; i.n1 = 0; i.n2 = 0; save(); render(); }
-function toggle(i, v) { i.status = v ? 'done' : 'open'; save(); render(); }
+function moveTo(i, d) { i.date = isoD(d); i.time = isoT(d); i.moved = (i.moved || 0) + 1; armReminders(i); save(); render(); }
+function toggle(i, v) { i.status = v ? 'done' : 'open'; if (v) delete i.rem; save(); render(); }
 
 // ---- Disegno ----
 function card(i) {
@@ -192,7 +204,11 @@ function render() {
   const rest = items.filter(i => !lateIds.has(i.id)).sort(byTime);
   $('#late').hidden = !late.length;
   $('#lateList').replaceChildren(...late.map(lateCard));
-  document.title = (late.length ? '(' + late.length + ') ' : '') + 'Slitta';
+  const pend = pending(now);
+  $('#remind').hidden = !pend.length;
+  $('#remind').replaceChildren(...pend.map(i => remBanner(i, now)));
+  const nAlert = late.length + pend.length;
+  document.title = (nAlert ? '(' + nAlert + ') ' : '') + 'Slitta';
   const t = rest.filter(i => i.date === today);
   $('#todayList').replaceChildren(...(t.length ? t.map(card) : [el('div', 'empty', 'Niente in programma per oggi.')]));
   const nb = $('#nextList'); nb.replaceChildren();
@@ -224,8 +240,8 @@ $('#form').onsubmit = e => {
   const a = new Date(data.date + 'T' + data.time), b = new Date(+a + data.dur * 60000);
   const clash = items.find(o => o.status === 'open' && o.id !== editId && start(o) < b && end(o) > a);
   if (clash && !confirm('Si sovrappone a "' + clash.title + '". Salvare lo stesso?')) { e.preventDefault(); return; }
-  if (editId) { const i = items.find(x => x.id === editId); if (i.date !== data.date || i.time !== data.time) { i.n1 = 0; i.n2 = 0; } Object.assign(i, data); }
-  else items.push({ id: uid(), status: 'open', moved: 0, ...data });
+  if (editId) { const i = items.find(x => x.id === editId); const changed = i.date !== data.date || i.time !== data.time; Object.assign(i, data); if (changed) armReminders(i); }
+  else { const n = { id: uid(), status: 'open', moved: 0, ...data }; armReminders(n); items.push(n); }
   save(); render();
 };
 
@@ -260,26 +276,96 @@ $('#impFile').onchange = async e => {
   e.target.value = '';
 };
 
-// ---- Avvisi (funzionano mentre l'app è aperta o in background nel browser) ----
-function notify(t, b) { if ('Notification' in window && Notification.permission === 'granted') { try { new Notification(t, { body: b }); } catch (e) {} } }
+// ---- Avvisi di sistema ----
+async function notify(title, body, tag) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const opts = { body, tag, icon: 'icon-192.png', badge: 'icon-192.png', requireInteraction: true, vibrate: [200, 100, 200] };
+  try {
+    const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
+    if (reg && reg.showNotification) { await reg.showNotification(title, opts); return; }
+    new Notification(title, opts);
+  } catch (e) { try { new Notification(title, { body }); } catch (x) {} }
+}
 function notifLabel() {
   const ok = 'Notification' in window;
   $('#notifBtn').textContent = !ok ? 'Avvisi non supportati' : Notification.permission === 'granted' ? 'Avvisi attivi' : 'Attiva avvisi';
   $('#notifBtn').disabled = !ok || Notification.permission === 'granted';
 }
 $('#notifBtn').onclick = () => Notification.requestPermission().then(notifLabel);
+
+// ---- Promemoria: 30 e 15 minuti prima ----
+const LEADS = [15, 30];     // minuti prima dell'inizio, dal più vicino al più lontano
+const ESCALATE_MS = 60000;  // se non confermi entro 1 minuto compare il popup
+const minsLeft = (i, now) => Math.max(1, Math.round((start(i) - now) / 60000));
+// Riarma i promemoria: le soglie già superate al momento dell'inserimento o dello spostamento vengono saltate
+function armReminders(i) {
+  const ms = start(i) - new Date();
+  i.n1 = 0; i.n2 = 0; delete i.rem;
+  i.rf = LEADS.filter(l => ms < l * 60000);
+}
+const pending = now => items.filter(i => i.status === 'open' && i.rem && start(i) > now);
+function ack(i) { delete i.rem; save(); render(); }
+function fireReminder(i, lead, now) {
+  i.rf = Array.from(new Set((i.rf || []).concat(LEADS.filter(l => l >= lead))));
+  i.rem = { lead, at: +now };
+  notify('Tra ' + minsLeft(i, now) + ' min: ' + i.title, 'Alle ' + i.time, 'slitta-' + i.id + '-' + lead);
+}
+function remBanner(i, now) {
+  const c = el('div', 'rem');
+  const g = el('div', 'grow'); g.style.cursor = 'default';
+  g.append(el('div', 't', '⏰ Tra ' + minsLeft(i, now) + ' min: ' + i.title), el('div', 'sub', 'Alle ' + i.time));
+  const ok = el('button', 'btn', 'Ok'); ok.onclick = () => ack(i);
+  const mv = el('button', 'btn', 'Sposta'); mv.onclick = () => { ack(i); openDlg(i); };
+  c.append(g, ok, mv);
+  return c;
+}
+let shown = [];
+function remPopupRow(i, now) {
+  const c = el('div', 'card row');
+  const g = el('div', 'grow'); g.style.cursor = 'default';
+  g.append(el('div', 't', i.title), el('div', 'sub', 'Tra ' + minsLeft(i, now) + ' min · alle ' + i.time));
+  const mv = el('button', 'btn ghost', 'Sposta'); mv.type = 'button';
+  mv.onclick = () => { ack(i); $('#remDlg').close(); openDlg(i); };
+  c.append(g, mv);
+  return c;
+}
+function ackShown() {
+  shown.forEach(id => { const i = items.find(x => x.id === id); if (i) delete i.rem; });
+  shown = []; save(); render();
+}
+// Popup: compare se un promemoria non è stato confermato entro ESCALATE_MS
+function escalate(now) {
+  const dlg = $('#remDlg');
+  const due = pending(now).filter(i => now - i.rem.at >= ESCALATE_MS);
+  if (!due.length) { if (dlg.open) dlg.close(); return; }
+  if (!dlg.open && document.querySelector('dialog[open]')) return; // non interrompe chi sta scrivendo
+  shown = due.map(i => i.id);
+  $('#remList').replaceChildren(...due.map(i => remPopupRow(i, now)));
+  if (!dlg.open) { dlg.showModal(); $('#remOk').focus(); }
+}
+$('#remOk').onclick = () => { ackShown(); $('#remDlg').close(); };
+$('#remDlg').addEventListener('cancel', ackShown);
+
 function tick() {
   const now = new Date(); let ch = false;
   for (const i of items) {
     if (i.status !== 'open') continue;
-    if (!i.n1 && start(i) <= now && end(i) > now) { notify('Ora: ' + i.title, 'Inizia adesso'); i.n1 = 1; ch = true; }
-    if (!i.n2 && end(i) <= now) { notify('Non fatto: ' + i.title, 'Apri Slitta per riprogrammarlo'); i.n2 = 1; ch = true; }
+    const ms = start(i) - now;
+    if (ms > 0) {
+      const lead = LEADS.find(l => ms <= l * 60000 && !(i.rf || []).includes(l));
+      if (lead) { fireReminder(i, lead, now); ch = true; }
+    } else if (i.rem) { delete i.rem; ch = true; }
+    if (!i.n1 && start(i) <= now && end(i) > now) { notify('Ora: ' + i.title, 'Inizia adesso', 'slitta-' + i.id + '-now'); i.n1 = 1; ch = true; }
+    if (!i.n2 && end(i) <= now) { notify('Non fatto: ' + i.title, 'Apri Slitta per riprogrammarlo', 'slitta-' + i.id + '-late'); i.n2 = 1; ch = true; }
   }
   if (ch) save();
   render();
+  escalate(now);
 }
 setInterval(tick, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+window.addEventListener('focus', tick);
+document.querySelectorAll('dialog').forEach(d => d.addEventListener('close', () => setTimeout(tick, 0)));
 notifLabel(); tick();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
