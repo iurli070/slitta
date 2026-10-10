@@ -52,6 +52,9 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
 .rem .t{font-weight:700}.rem .sub{color:inherit;opacity:.85}
 .rem .btn{background:var(--on);color:var(--brand)}
 #remList{margin-top:10px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:12px;background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 12px 10px 16px;max-width:calc(100% - 24px);z-index:5}
+#toast[hidden]{display:none}
+#toast button{border:0;background:transparent;color:inherit;font-weight:700;text-decoration:underline;padding:6px}
 </style>
 </head>
 <body>
@@ -63,6 +66,7 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
   <h2>Oggi</h2><div id="todayList"></div>
   <h2>Prossimi giorni</h2><div id="nextList"></div>
 </main>
+<div id="toast" role="status" aria-live="polite" hidden></div>
 <div class="bar">
   <button class="btn" id="newBtn">+ Nuovo appuntamento</button>
   <button class="btn ghost" id="notifBtn"></button>
@@ -162,7 +166,17 @@ function suggest(i) {
 
 // ---- Azioni ----
 function moveTo(i, d) { i.date = isoD(d); i.time = isoT(d); i.moved = (i.moved || 0) + 1; armReminders(i); save(); render(); }
-function toggle(i, v) { i.status = v ? 'done' : 'open'; if (v) delete i.rem; save(); render(); }
+function toggle(i, v) { i.status = v ? 'done' : 'open'; if (v) delete i.rem; save(); render(); if (v) showUndo(i); }
+// Avviso con "Annulla": l'attività completata sparisce dalla lista ma si può recuperare per qualche secondo
+let toastTimer = null;
+function showUndo(i) {
+  const t = $('#toast'); t.replaceChildren();
+  const b = el('button', '', 'Annulla'); b.type = 'button';
+  b.onclick = () => { t.hidden = true; clearTimeout(toastTimer); toggle(i, false); };
+  t.append(el('span', '', '"' + i.title + '" completato'), b);
+  t.hidden = false; clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 7000);
+}
 
 // ---- Disegno ----
 function card(i) {
@@ -209,8 +223,9 @@ function render() {
   $('#remind').replaceChildren(...pend.map(i => remBanner(i, now)));
   const nAlert = late.length + pend.length;
   document.title = (nAlert ? '(' + nAlert + ') ' : '') + 'Slitta';
-  const t = rest.filter(i => i.date === today);
-  $('#todayList').replaceChildren(...(t.length ? t.map(card) : [el('div', 'empty', 'Niente in programma per oggi.')]));
+  const t = rest.filter(i => i.date === today && i.status === 'open');
+  const doneToday = rest.some(i => i.date === today && i.status === 'done');
+  $('#todayList').replaceChildren(...(t.length ? t.map(card) : [el('div', 'empty', doneToday ? 'Tutto fatto per oggi.' : 'Niente in programma per oggi.')]));
   const nb = $('#nextList'); nb.replaceChildren();
   const fut = rest.filter(i => i.date > today && i.status === 'open');
   if (!fut.length) nb.append(el('div', 'empty', 'Nessun appuntamento nei prossimi giorni. Premi "+ Nuovo appuntamento".'));
