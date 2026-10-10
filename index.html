@@ -33,6 +33,7 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--brand);flex:none}
 #late{background:var(--warn);border-radius:18px;padding:4px 14px 10px;margin-top:8px}
 #late h2{color:var(--warnink);margin-top:12px}
 .late{border-color:transparent}
+.hintwarn{font-size:14px;color:var(--warnink);margin-top:6px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px}
 .chip{border:2px solid var(--brand);background:transparent;color:var(--brand);border-radius:12px;padding:8px 12px;font-weight:600;text-align:left}
 .chip small{display:block;font-weight:400;color:var(--mute)}
@@ -46,15 +47,33 @@ dialog::backdrop{background:rgba(5,15,12,.55)}
 label{display:block;font-size:14px;color:var(--mute);margin:12px 0 4px}
 input[type=text],input[type=date],input[type=time],select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
 .two{display:flex;gap:10px}.two>div{flex:1}
-.end{display:flex;gap:8px;margin-top:18px}.end .sp{flex:1}
+.end{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}.end .sp{flex:1}
+.chk{display:flex;gap:10px;align-items:center;color:var(--ink);font-size:15px;margin:16px 0 0}
 #remind{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
 .rem{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--brand);color:var(--on);border-radius:14px;padding:12px 14px}
+.rem .grow{flex:1 1 100%}
 .rem .t{font-weight:700}.rem .sub{color:inherit;opacity:.85}
 .rem .btn{background:var(--on);color:var(--brand)}
 #remList{margin-top:10px}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:12px;background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 12px 10px 16px;max-width:calc(100% - 24px);z-index:5}
 #toast[hidden]{display:none}
 #toast button{border:0;background:transparent;color:inherit;font-weight:700;text-decoration:underline;padding:6px}
+.tabs{display:flex;gap:6px;background:var(--soft);border-radius:14px;padding:4px;margin:0 0 14px}
+.tabs button{flex:1;border:0;background:transparent;border-radius:10px;padding:9px;font-weight:600;color:var(--brand)}
+.tabs button[aria-selected=true]{background:var(--brand);color:var(--on)}
+.quick{display:flex;gap:8px;margin-bottom:6px}
+.mhead{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px}
+.mhead h2{margin:0;text-transform:capitalize}
+.icon{border:0;background:var(--soft);color:var(--brand);width:44px;height:44px;border-radius:12px;font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.dow{text-align:center;font-size:13px;color:var(--mute);padding:4px 0}
+.cell{aspect-ratio:1;border:1px solid var(--line);border-radius:12px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-weight:600}
+.cell.out{background:transparent;color:var(--mute);font-weight:400;border-color:transparent}
+.cell.today{box-shadow:inset 0 0 0 2px var(--brand)}
+.cell.sel{background:var(--brand);color:var(--on)}
+.dots{display:flex;gap:2px;height:6px}.dots i{width:6px;height:6px;border-radius:50%;background:var(--brand)}
+.cell.sel .dots i{background:var(--on)}
+#dayTitle{text-transform:capitalize}
 </style>
 </head>
 <body>
@@ -62,9 +81,31 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
   <h1>Slitta</h1>
   <p id="date"></p>
   <section id="remind" hidden aria-live="assertive"></section>
-  <section id="late" hidden aria-live="polite"><h2>Da riprogrammare</h2><div id="lateList"></div></section>
-  <h2>Oggi</h2><div id="todayList"></div>
-  <h2>Prossimi giorni</h2><div id="nextList"></div>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tList" aria-selected="true">Lista</button>
+    <button type="button" role="tab" id="tMonth" aria-selected="false">Mese</button>
+  </div>
+
+  <div id="viewList">
+    <form class="quick" id="quickForm">
+      <input type="text" id="quick" placeholder='Scrivi: "dentista domani alle 10"' aria-label="Inserimento rapido" autocomplete="off">
+      <button class="btn ghost" type="submit">Aggiungi</button>
+    </form>
+    <section id="late" hidden aria-live="polite"><h2>Da riprogrammare</h2><div id="lateList"></div></section>
+    <h2>Oggi</h2><div id="todayList"></div>
+    <h2>Prossimi giorni</h2><div id="nextList"></div>
+  </div>
+
+  <div id="viewMonth" hidden>
+    <div class="mhead">
+      <button type="button" class="icon" id="mPrev" aria-label="Mese precedente">‹</button>
+      <h2 id="mTitle"></h2>
+      <button type="button" class="icon" id="mNext" aria-label="Mese successivo">›</button>
+    </div>
+    <div class="grid" id="calendar"></div>
+    <h2 id="dayTitle"></h2>
+    <div id="dayList"></div>
+  </div>
 </main>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 <div class="bar">
@@ -81,14 +122,28 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
       <div><label for="fD">Giorno</label><input type="date" id="fD" required></div>
       <div><label for="fH">Ora</label><input type="time" id="fH" required></div>
     </div>
-    <label for="fL">Durata</label>
-    <select id="fL"><option value="15">15 minuti</option><option value="30" selected>30 minuti</option><option value="45">45 minuti</option><option value="60">1 ora</option><option value="90">1 ora e 30</option><option value="120">2 ore</option></select>
+    <div class="two">
+      <div><label for="fL">Durata</label>
+        <select id="fL"><option value="15">15 minuti</option><option value="30" selected>30 minuti</option><option value="45">45 minuti</option><option value="60">1 ora</option><option value="90">1 ora e 30</option><option value="120">2 ore</option></select></div>
+      <div><label for="fR">Ripeti</label>
+        <select id="fR"><option value="none">Mai</option><option value="daily">Ogni giorno</option><option value="weekdays">Giorni feriali</option><option value="weekly">Ogni settimana</option><option value="monthly">Ogni mese</option></select></div>
+    </div>
     <div class="end">
       <button type="button" class="btn bad" id="fDel">Elimina</button><span class="sp"></span>
       <button type="button" class="btn ghost" id="fNo">Annulla</button>
       <button type="submit" class="btn">Salva</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="delDlg">
+  <h3 style="margin:0">Elimina appuntamento ripetuto</h3>
+  <p class="sub">Questo appuntamento si ripete. Vuoi eliminare solo questo o tutta la serie?</p>
+  <div class="end">
+    <button type="button" class="btn ghost" id="delNo">Annulla</button><span class="sp"></span>
+    <button type="button" class="btn bad" id="delOne">Solo questo</button>
+    <button type="button" class="btn" id="delAll">Tutta la serie</button>
+  </div>
 </dialog>
 
 <dialog id="remDlg" aria-labelledby="remT">
@@ -105,6 +160,10 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
       <div><label for="cS">Inizio giornata</label><input type="time" id="cS" required></div>
       <div><label for="cE">Fine giornata</label><input type="time" id="cE" required></div>
     </div>
+    <label class="chk"><input type="checkbox" id="cNag"> Ripeti l'avviso ogni 5 minuti finché non confermi</label>
+    <h4 style="margin:20px 0 4px">Calendario</h4>
+    <p class="sub">Esporta gli appuntamenti aperti in un file da aprire con Google Calendar, Apple Calendar o Outlook, con gli avvisi a 30 e 15 minuti.</p>
+    <div class="acts"><button type="button" class="btn ghost" id="icsBtn">Esporta per il calendario (.ics)</button></div>
     <h4 style="margin:20px 0 4px">Backup</h4>
     <p class="sub">I dati restano su questo dispositivo. Scarica un file per non perderli o per spostarli.</p>
     <div class="acts">
@@ -124,7 +183,8 @@ input[type=text],input[type=date],input[type=time],select{width:100%;padding:11p
 const $ = s => document.querySelector(s);
 const KEY = 'slitta.v1', CFG = 'slitta.cfg', STEP = 15;
 let WORK = [9 * 60, 18 * 60]; // fascia in cui propone gli spostamenti (modificabile dalle impostazioni)
-try { const c = JSON.parse(localStorage.getItem(CFG) || 'null'); if (c && c.s < c.e) WORK = [c.s, c.e]; } catch (e) {}
+let NAG = true;               // ripete l'avviso finché non confermi
+try { const c = JSON.parse(localStorage.getItem(CFG) || 'null'); if (c && c.s < c.e) WORK = [c.s, c.e]; if (c && c.nag === false) NAG = false; } catch (e) {}
 let items = [];
 try { items = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) { alert('Impossibile salvare i dati in questo browser.'); } };
@@ -132,10 +192,14 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const p2 = n => String(n).padStart(2, '0');
 const isoD = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
 const isoT = d => p2(d.getHours()) + ':' + p2(d.getMinutes());
+const parseD = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const start = i => new Date(i.date + 'T' + i.time);
 const end = i => new Date(+start(i) + (i.dur || 30) * 60000);
 const dayLbl = d => d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const byTime = (a, b) => (a.date + a.time).localeCompare(b.date + b.time);
+const toMin = t => { const [a, b] = t.split(':').map(Number); return a * 60 + b; };
+const fromMin = m => p2(Math.floor(m / 60)) + ':' + p2(m % 60);
 
 // ---- Cerca il primo spazio libero dentro l'orario di lavoro ----
 function overlaps(a, b, exceptId) {
@@ -164,9 +228,40 @@ function suggest(i) {
   return out;
 }
 
+// ---- Appuntamenti ricorrenti ----
+// La prossima occorrenza nasce quando completi l'appuntamento o quando scade: la serie non si ferma mai e non accumula arretrati.
+const REPS = { none: 'Mai', daily: 'Ogni giorno', weekdays: 'Giorni feriali', weekly: 'Ogni settimana', monthly: 'Ogni mese' };
+const isRep = i => !!i.rep && i.rep !== 'none';
+function nextDate(d, rep, rday) {
+  const n = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (rep === 'daily') n.setDate(n.getDate() + 1);
+  else if (rep === 'weekdays') { do { n.setDate(n.getDate() + 1); } while (n.getDay() === 0 || n.getDay() === 6); }
+  else if (rep === 'weekly') n.setDate(n.getDate() + 7);
+  else if (rep === 'monthly') {
+    const day = rday || d.getDate();
+    n.setDate(1); n.setMonth(n.getMonth() + 1);
+    n.setDate(Math.min(day, new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate()));
+  }
+  return n;
+}
+function spawnNext(i) {
+  if (!isRep(i) || i.nx) return null;
+  const today = parseD(isoD(new Date()));
+  let d = nextDate(parseD(i.date), i.rep, i.rday);
+  for (let k = 0; k < 800 && d < today; k++) d = nextDate(d, i.rep, i.rday);
+  const n = { id: uid(), status: 'open', moved: 0, title: i.title, date: isoD(d), time: i.time, dur: i.dur, rep: i.rep, sid: i.sid || i.id, rday: i.rday };
+  armReminders(n); items.push(n); i.nx = n.id;
+  return n;
+}
+
 // ---- Azioni ----
 function moveTo(i, d) { i.date = isoD(d); i.time = isoT(d); i.moved = (i.moved || 0) + 1; armReminders(i); save(); render(); }
-function toggle(i, v) { i.status = v ? 'done' : 'open'; if (v) delete i.rem; save(); render(); if (v) showUndo(i); }
+function toggle(i, v) {
+  i.status = v ? 'done' : 'open';
+  if (v) { delete i.rem; delete i.snz; spawnNext(i); }
+  else if (i.nx) { const c = items.find(x => x.id === i.nx); if (c && c.status === 'open') items = items.filter(x => x !== c); delete i.nx; }
+  save(); render(); if (v) showUndo(i);
+}
 // Avviso con "Annulla": l'attività completata sparisce dalla lista ma si può recuperare per qualche secondo
 let toastTimer = null;
 function showUndo(i) {
@@ -177,6 +272,16 @@ function showUndo(i) {
   t.hidden = false; clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.hidden = true; }, 7000);
 }
+function skip(i) { spawnNext(i); items = items.filter(x => x !== i); save(); render(); }
+let delTarget = null;
+function removeItem(i) {
+  if (isRep(i)) { delTarget = i; $('#delDlg').showModal(); return; }
+  if (!confirm('Eliminare "' + i.title + '"?')) return;
+  items = items.filter(x => x !== i); save(); render();
+}
+$('#delNo').onclick = () => $('#delDlg').close();
+$('#delOne').onclick = () => { const i = delTarget; if (i) { spawnNext(i); items = items.filter(x => x !== i); save(); } $('#delDlg').close(); render(); };
+$('#delAll').onclick = () => { const i = delTarget; if (i) { const sid = i.sid || i.id; items = items.filter(x => (x.sid || x.id) !== sid || x.status !== 'open'); save(); } $('#delDlg').close(); render(); };
 
 // ---- Disegno ----
 function card(i) {
@@ -184,7 +289,7 @@ function card(i) {
   const cb = el('input'); cb.type = 'checkbox'; cb.checked = i.status === 'done';
   cb.setAttribute('aria-label', 'Fatto'); cb.onchange = () => toggle(i, cb.checked);
   const g = el('div', 'grow'); g.tabIndex = 0; g.setAttribute('role', 'button');
-  g.append(el('div', 't', i.title), el('div', 'sub', i.dur + ' min' + (i.moved ? ' · spostato ' + i.moved + (i.moved > 1 ? ' volte' : ' volta') : '')));
+  g.append(el('div', 't', i.title), el('div', 'sub', i.dur + ' min' + (isRep(i) ? ' · 🔁 ' + REPS[i.rep] : '') + (i.moved ? ' · spostato ' + i.moved + (i.moved > 1 ? ' volte' : ' volta') : '')));
   g.onclick = () => openDlg(i);
   g.onkeydown = e => { if (e.key === 'Enter') openDlg(i); };
   row.append(cb, el('div', 'time', i.time), g);
@@ -193,7 +298,8 @@ function card(i) {
 function lateCard(i) {
   const c = el('div', 'card late');
   c.append(el('div', 't', i.title));
-  c.append(el('div', 'sub', 'Era previsto ' + dayLbl(start(i)) + ' alle ' + i.time + (i.moved ? ' · già spostato ' + i.moved + 'x' : '')));
+  c.append(el('div', 'sub', 'Era previsto ' + dayLbl(start(i)) + ' alle ' + i.time + (isRep(i) ? ' · 🔁 ' + REPS[i.rep] : '') + (i.moved ? ' · già spostato ' + i.moved + 'x' : '')));
+  if ((i.moved || 0) >= 3) c.append(el('div', 'hintwarn', 'Spostato ' + i.moved + ' volte. Vale ancora la pena? Puoi eliminarlo oppure dividerlo in passi più piccoli.'));
   const chips = el('div', 'chips');
   for (const s of suggest(i)) {
     const b = el('button', 'chip', s.label); b.type = 'button';
@@ -204,15 +310,16 @@ function lateCard(i) {
   const a = el('div', 'acts');
   const done = el('button', 'btn ghost', 'Fatto'); done.onclick = () => toggle(i, true);
   const other = el('button', 'btn ghost', 'Scegli tu'); other.onclick = () => openDlg(i);
-  const del = el('button', 'btn bad', 'Elimina'); del.onclick = () => { if (confirm('Eliminare "' + i.title + '"?')) { items = items.filter(x => x.id !== i.id); save(); render(); } };
-  a.append(done, other, del);
+  a.append(done, other);
+  if (isRep(i)) { const sk = el('button', 'btn ghost', 'Salta questa'); sk.onclick = () => skip(i); a.append(sk); }
+  const del = el('button', 'btn bad', 'Elimina'); del.onclick = () => removeItem(i);
+  a.append(del);
   c.append(chips, a);
   return c;
 }
 function render() {
   const now = new Date(), today = isoD(now);
   $('#date').textContent = now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const byTime = (a, b) => (a.date + a.time).localeCompare(b.date + b.time);
   const late = items.filter(i => i.status === 'open' && end(i) <= now).sort(byTime);
   const lateIds = new Set(late.map(i => i.id));
   const rest = items.filter(i => !lateIds.has(i.id)).sort(byTime);
@@ -231,53 +338,197 @@ function render() {
   if (!fut.length) nb.append(el('div', 'empty', 'Nessun appuntamento nei prossimi giorni. Premi "+ Nuovo appuntamento".'));
   let last = '';
   for (const i of fut) { if (i.date !== last) { nb.append(el('div', 'day', dayLbl(start(i)))); last = i.date; } nb.append(card(i)); }
+  if (view === 'month') renderMonth();
 }
+
+// ---- Calendario mensile ----
+let view = 'list', mon = new Date(), selDay = isoD(new Date());
+mon = new Date(mon.getFullYear(), mon.getMonth(), 1);
+function setView(v) {
+  view = v;
+  $('#viewList').hidden = v !== 'list'; $('#viewMonth').hidden = v !== 'month';
+  $('#tList').setAttribute('aria-selected', String(v === 'list')); $('#tMonth').setAttribute('aria-selected', String(v === 'month'));
+  render();
+}
+function renderMonth() {
+  $('#mTitle').textContent = mon.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+  const g = $('#calendar'); g.replaceChildren();
+  ['L', 'M', 'M', 'G', 'V', 'S', 'D'].forEach(x => g.append(el('div', 'dow', x)));
+  const first = new Date(mon.getFullYear(), mon.getMonth(), 1);
+  const st = new Date(first); st.setDate(1 - (first.getDay() + 6) % 7);
+  const cnt = {}; items.forEach(i => { if (i.status === 'open') cnt[i.date] = (cnt[i.date] || 0) + 1; });
+  const tIso = isoD(new Date());
+  for (let n = 0; n < 42; n++) {
+    const d = new Date(st); d.setDate(st.getDate() + n); const s = isoD(d);
+    const c = el('button', 'cell' + (d.getMonth() !== mon.getMonth() ? ' out' : '') + (s === tIso ? ' today' : '') + (s === selDay ? ' sel' : '')); c.type = 'button';
+    c.setAttribute('aria-label', d.toLocaleDateString('it-IT', { dateStyle: 'full' }) + (cnt[s] ? ', ' + cnt[s] + ' appuntamenti' : ''));
+    const dots = el('span', 'dots'); for (let k = 0; k < Math.min(cnt[s] || 0, 3); k++) dots.append(el('i'));
+    c.append(el('span', '', d.getDate()), dots);
+    c.onclick = () => { selDay = s; if (d.getMonth() !== mon.getMonth()) mon = new Date(d.getFullYear(), d.getMonth(), 1); renderMonth(); };
+    g.append(c);
+  }
+  $('#dayTitle').textContent = parseD(selDay).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+  const dl = items.filter(i => i.status === 'open' && i.date === selDay).sort(byTime);
+  $('#dayList').replaceChildren(...(dl.length ? dl.map(card) : [el('div', 'empty', 'Nessun appuntamento in questo giorno.')]));
+}
+$('#tList').onclick = () => setView('list');
+$('#tMonth').onclick = () => setView('month');
+$('#mPrev').onclick = () => { mon = new Date(mon.getFullYear(), mon.getMonth() - 1, 1); renderMonth(); };
+$('#mNext').onclick = () => { mon = new Date(mon.getFullYear(), mon.getMonth() + 1, 1); renderMonth(); };
+
+// ---- Inserimento rapido a frase (italiano) ----
+const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+const DOWS = { domenica: 0, lunedi: 1, 'lunedì': 1, martedi: 2, 'martedì': 2, mercoledi: 3, 'mercoledì': 3, giovedi: 4, 'giovedì': 4, venerdi: 5, 'venerdì': 5, sabato: 6 };
+const DOW_ALT = Object.keys(DOWS).join('|');
+function parseQuick(txt, now) {
+  let s = ' ' + txt.replace(/\s+/g, ' ').trim() + ' ';
+  const out = { title: '', date: null, time: null, dur: null, rep: null };
+  let am = false, pm = null, offset = null, dow = null, dom = null, dmy = null;
+  const take = (src, fn) => {
+    const m = new RegExp('(^|\\s)(?:' + src + ')(?=[\\s.,;!?]|$)', 'i').exec(s);
+    if (!m) return false;
+    s = s.slice(0, m.index) + ' ' + s.slice(m.index + m[0].length);
+    fn(m); return true;
+  };
+  // ripetizione
+  take('ogni giorno|tutti i giorni', () => { out.rep = 'daily'; });
+  take('nei giorni feriali|nei feriali|dal luned[iì] al venerd[iì]', () => { out.rep = 'weekdays'; });
+  take('ogni settimana|tutte le settimane', () => { out.rep = 'weekly'; });
+  take('ogni mese|tutti i mesi', () => { out.rep = 'monthly'; });
+  take('ogni (' + DOW_ALT + ')', m => { out.rep = 'weekly'; dow = DOWS[m[2].toLowerCase()]; });
+  // durata
+  take('per (\\d+(?:[.,]\\d+)?) ?(?:ore|ora|h)', m => { out.dur = Math.round(parseFloat(m[2].replace(',', '.')) * 60); });
+  take('per (\\d+) ?(?:minuti|minuto|min)', m => { out.dur = +m[2]; });
+  take('per mezz[\'’]?ora', () => { out.dur = 30; });
+  take('per un[\'’]?ora', () => { out.dur = 60; });
+  // momento della giornata
+  take('(?:del |nel |di )?pomeriggio', () => { pm = 'pom'; });
+  take('(?:di |della |alla )sera', () => { pm = 'sera'; });
+  take('(?:di |della |del |nella )?(?:mattina|mattino)', () => { am = true; });
+  // ora
+  const hm = (h, mi) => { h = +h; mi = mi ? +mi : 0; return h <= 23 && mi <= 59 ? p2(h) + ':' + p2(mi) : null; };
+  take('(?:alle|all[\'’]|ore)\\s*(\\d{1,2})(?:[:.](\\d{2}))?', m => { out.time = hm(m[2], m[3]); });
+  if (!out.time) take('(\\d{1,2}):(\\d{2})', m => { out.time = hm(m[2], m[3]); });
+  if (!out.time) take('mezzogiorno', () => { out.time = '12:00'; });
+  // giorno
+  take('dopodomani', () => { offset = 2; });
+  take('domani', () => { offset = 1; });
+  take('domattina', () => { offset = 1; am = true; });
+  take('stamattina', () => { offset = 0; am = true; });
+  take('stasera', () => { offset = 0; pm = 'sera'; });
+  take('oggi', () => { offset = 0; });
+  take('(?:il )?(\\d{1,2})/(\\d{1,2})(?:/(\\d{2,4}))?', m => { dmy = [+m[2], +m[3], m[4] ? +m[4] : null]; });
+  if (!dmy) take('(?:il )?(\\d{1,2}) (' + MONTHS.join('|') + ')(?: (\\d{4}))?', m => { dmy = [+m[2], MONTHS.indexOf(m[3].toLowerCase()) + 1, m[4] ? +m[4] : null]; });
+  if (dow === null) take('(?:(?:il|prossimo|questo) )?(' + DOW_ALT + ')', m => { dow = DOWS[m[2].toLowerCase()]; });
+  if (!dmy && offset === null && dow === null) take('il (\\d{1,2})', m => { dom = +m[2]; });
+  const mid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let d = null;
+  if (offset !== null) { d = new Date(mid); d.setDate(d.getDate() + offset); }
+  else if (dmy) {
+    const y = dmy[2] ? (dmy[2] < 100 ? 2000 + dmy[2] : dmy[2]) : mid.getFullYear();
+    d = new Date(y, dmy[1] - 1, dmy[0]);
+    if (!dmy[2] && d < mid) d = new Date(y + 1, dmy[1] - 1, dmy[0]);
+    if (d.getMonth() !== dmy[1] - 1) d = null;
+  } else if (dow !== null) {
+    d = new Date(mid); let diff = (dow - mid.getDay() + 7) % 7; if (diff === 0) diff = 7; d.setDate(d.getDate() + diff);
+  } else if (dom !== null) {
+    d = new Date(mid.getFullYear(), mid.getMonth(), dom);
+    if (d < mid) d = new Date(mid.getFullYear(), mid.getMonth() + 1, dom);
+    if (d.getDate() !== dom) d = null;
+  }
+  if (d) out.date = isoD(d);
+  if (!out.time) { if (am) out.time = '09:00'; else if (pm === 'pom') out.time = '15:00'; else if (pm === 'sera') out.time = '20:00'; }
+  else if (pm && +out.time.slice(0, 2) < 12) out.time = p2(+out.time.slice(0, 2) + 12) + out.time.slice(2);
+  let t = s.trim();
+  const lead = /^(il|lo|la|alle|all['’]|ore|per|a|di|da|entro|e|,|\.|-)\s+/i, tail = /\s+(il|alle|all['’]|ore|per|a|di|da|entro|e|,|\.|-)$/i;
+  for (let k = 0; k < 4; k++) t = t.replace(lead, '').replace(tail, '');
+  t = t.replace(/\s+([,.;])/g, '$1').replace(/[,.;]+$/, '').trim();
+  out.title = t.charAt(0).toUpperCase() + t.slice(1);
+  return out;
+}
+$('#quickForm').onsubmit = e => {
+  e.preventDefault();
+  const txt = $('#quick').value.trim(); if (!txt) return;
+  const now = new Date(), q = parseQuick(txt, now), pre = { title: q.title || txt };
+  if (q.dur) pre.dur = q.dur;
+  if (q.rep) pre.rep = q.rep;
+  if (q.date) pre.date = q.date;
+  if (q.time) pre.time = q.time;
+  if (pre.time && !pre.date) {
+    const t = new Date(isoD(now) + 'T' + pre.time);
+    const dd = new Date(now); if (t <= now) dd.setDate(dd.getDate() + 1);
+    pre.date = isoD(dd);
+  }
+  if (pre.date && !pre.time) {
+    const from = new Date(Math.max(+new Date(pre.date + 'T' + fromMin(WORK[0])), +now));
+    const f = freeFrom(from, pre.dur || 30);
+    pre.time = isoD(f) === pre.date ? isoT(f) : fromMin(WORK[0]);
+  }
+  $('#quick').value = '';
+  openDlg(null, pre);
+};
 
 // ---- Finestra di modifica ----
 let editId = null;
-function openDlg(i) {
+function openDlg(i, pre) {
   editId = i ? i.id : null;
   $('#dlgT').textContent = i ? 'Modifica appuntamento' : 'Nuovo appuntamento';
   const d = new Date(); d.setSeconds(0, 0); d.setMinutes(Math.ceil((d.getMinutes() + 1) / STEP) * STEP);
-  $('#fT').value = i ? i.title : '';
-  $('#fD').value = i ? i.date : isoD(d);
-  $('#fH').value = i ? i.time : isoT(d);
-  $('#fL').value = i ? i.dur : 30;
+  let date = isoD(d), time = isoT(d);
+  if (!i && view === 'month' && selDay !== isoD(new Date())) {
+    const f = freeFrom(new Date(selDay + 'T' + fromMin(WORK[0])), 30);
+    date = selDay; time = isoD(f) === selDay ? isoT(f) : fromMin(WORK[0]);
+  }
+  const src = i || Object.assign({ title: '', date, time, dur: 30, rep: 'none' }, pre || {});
+  const dur = String(src.dur || 30);
+  if (![...$('#fL').options].some(o => o.value === dur)) $('#fL').add(new Option(dur + ' minuti', dur));
+  $('#fT').value = src.title;
+  $('#fD').value = src.date;
+  $('#fH').value = src.time;
+  $('#fL').value = dur;
+  $('#fR').value = src.rep || 'none';
   $('#fDel').style.display = i ? '' : 'none';
   $('#dlg').showModal(); $('#fT').focus();
 }
 $('#newBtn').onclick = () => openDlg(null);
 $('#fNo').onclick = () => $('#dlg').close();
-$('#fDel').onclick = () => { if (!confirm('Eliminare questo appuntamento?')) return; items = items.filter(x => x.id !== editId); save(); $('#dlg').close(); render(); };
+$('#fDel').onclick = () => { const i = items.find(x => x.id === editId); $('#dlg').close(); if (i) removeItem(i); };
 $('#form').onsubmit = e => {
-  const data = { title: $('#fT').value.trim(), date: $('#fD').value, time: $('#fH').value, dur: +$('#fL').value };
+  const data = { title: $('#fT').value.trim(), date: $('#fD').value, time: $('#fH').value, dur: +$('#fL').value, rep: $('#fR').value };
   if (!data.title || !data.date || !data.time) return;
   const a = new Date(data.date + 'T' + data.time), b = new Date(+a + data.dur * 60000);
   const clash = items.find(o => o.status === 'open' && o.id !== editId && start(o) < b && end(o) > a);
   if (clash && !confirm('Si sovrappone a "' + clash.title + '". Salvare lo stesso?')) { e.preventDefault(); return; }
-  if (editId) { const i = items.find(x => x.id === editId); const changed = i.date !== data.date || i.time !== data.time; Object.assign(i, data); if (changed) armReminders(i); }
-  else { const n = { id: uid(), status: 'open', moved: 0, ...data }; armReminders(n); items.push(n); }
+  if (editId) {
+    const i = items.find(x => x.id === editId);
+    const changed = i.date !== data.date || i.time !== data.time;
+    Object.assign(i, data);
+    if (changed) { i.rday = parseD(data.date).getDate(); armReminders(i); }
+    if (isRep(i) && !i.sid) i.sid = i.id;
+  } else {
+    const n = { id: uid(), status: 'open', moved: 0, ...data };
+    n.sid = n.id; n.rday = parseD(data.date).getDate();
+    armReminders(n); items.push(n);
+  }
   save(); render();
 };
 
-// ---- Impostazioni e backup ----
-const toMin = t => { const [a, b] = t.split(':').map(Number); return a * 60 + b; };
-const fromMin = m => p2(Math.floor(m / 60)) + ':' + p2(m % 60);
-$('#cfgBtn').onclick = () => { $('#cS').value = fromMin(WORK[0]); $('#cE').value = fromMin(WORK[1]); $('#cfgMsg').textContent = ''; $('#cfgDlg').showModal(); };
+// ---- Impostazioni, backup ed esportazione ----
+$('#cfgBtn').onclick = () => { $('#cS').value = fromMin(WORK[0]); $('#cE').value = fromMin(WORK[1]); $('#cNag').checked = NAG; $('#cfgMsg').textContent = ''; $('#cfgDlg').showModal(); };
 $('#cNo').onclick = () => $('#cfgDlg').close();
 $('#cfgForm').onsubmit = e => {
   const a = toMin($('#cS').value), b = toMin($('#cE').value);
   if (a >= b) { e.preventDefault(); $('#cfgMsg').textContent = 'La fine della giornata deve essere dopo l\'inizio.'; return; }
-  WORK = [a, b];
-  try { localStorage.setItem(CFG, JSON.stringify({ s: a, e: b })); } catch (x) {}
+  WORK = [a, b]; NAG = $('#cNag').checked;
+  try { localStorage.setItem(CFG, JSON.stringify({ s: a, e: b, nag: NAG })); } catch (x) {}
   render();
 };
-$('#expBtn').onclick = () => {
-  const blob = new Blob([JSON.stringify({ items, work: WORK }, null, 2)], { type: 'application/json' });
+function download(name, type, text) {
+  const blob = new Blob([text], { type });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'slitta-backup-' + isoD(new Date()) + '.json'; a.click(); URL.revokeObjectURL(a.href);
-  $('#cfgMsg').textContent = 'Backup scaricato.';
-};
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+$('#expBtn').onclick = () => { download('slitta-backup-' + isoD(new Date()) + '.json', 'application/json', JSON.stringify({ items, work: WORK }, null, 2)); $('#cfgMsg').textContent = 'Backup scaricato.'; };
 $('#impBtn').onclick = () => $('#impFile').click();
 $('#impFile').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
@@ -285,10 +536,38 @@ $('#impFile').onchange = async e => {
     const d = JSON.parse(await f.text());
     if (!Array.isArray(d.items)) throw 0;
     if (!confirm('Questo sostituirà gli appuntamenti attuali. Continuare?')) return;
-    items = d.items.filter(i => i && i.title && i.date && i.time).map(i => ({ id: i.id || uid(), status: i.status === 'done' ? 'done' : 'open', moved: i.moved || 0, dur: i.dur || 30, title: i.title, date: i.date, time: i.time }));
+    items = d.items.filter(i => i && i.title && i.date && i.time).map(i => ({ id: i.id || uid(), status: i.status === 'done' ? 'done' : 'open', moved: i.moved || 0, dur: i.dur || 30, title: i.title, date: i.date, time: i.time, rep: i.rep || 'none', sid: i.sid, rday: i.rday, nx: i.nx }));
     save(); render(); $('#cfgMsg').textContent = 'Ripristinati ' + items.length + ' appuntamenti.';
   } catch (x) { $('#cfgMsg').textContent = 'File non valido: scegli un backup creato da Slitta.'; }
   e.target.value = '';
+};
+// Esportazione .ics: apribile da Google Calendar, Apple Calendar e Outlook, con avvisi a 30 e 15 minuti
+const icsEsc = t => String(t).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+const icsT = d => d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + 'T' + p2(d.getHours()) + p2(d.getMinutes()) + '00';
+const fold = line => {
+  const a = Array.from(line); if (a.length <= 74) return line;
+  const out = [a.slice(0, 74).join('')];
+  for (let k = 74; k < a.length; k += 73) out.push(' ' + a.slice(k, k + 73).join(''));
+  return out.join('\r\n');
+};
+function buildIcs() {
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Slitta//IT', 'CALSCALE:GREGORIAN'];
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  const rules = { daily: 'FREQ=DAILY', weekdays: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', weekly: 'FREQ=WEEKLY', monthly: 'FREQ=MONTHLY' };
+  for (const i of items.filter(x => x.status === 'open')) {
+    L.push('BEGIN:VEVENT', 'UID:' + i.id + '@slitta', 'DTSTAMP:' + stamp, 'DTSTART:' + icsT(start(i)), 'DTEND:' + icsT(end(i)), 'SUMMARY:' + icsEsc(i.title));
+    if (rules[i.rep]) L.push('RRULE:' + rules[i.rep]);
+    for (const m of LEADS.slice().sort((a, b) => b - a)) L.push('BEGIN:VALARM', 'TRIGGER:-PT' + m + 'M', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEsc(i.title), 'END:VALARM');
+    L.push('END:VEVENT');
+  }
+  L.push('END:VCALENDAR');
+  return L.map(fold).join('\r\n') + '\r\n';
+}
+$('#icsBtn').onclick = () => {
+  const n = items.filter(x => x.status === 'open').length;
+  if (!n) { $('#cfgMsg').textContent = 'Non ci sono appuntamenti da esportare.'; return; }
+  download('slitta-calendario.ics', 'text/calendar', buildIcs());
+  $('#cfgMsg').textContent = 'File del calendario scaricato (' + n + ' appuntamenti). Aprilo per importarlo.';
 };
 
 // ---- Avvisi di sistema ----
@@ -311,15 +590,18 @@ $('#notifBtn').onclick = () => Notification.requestPermission().then(notifLabel)
 // ---- Promemoria: 30 e 15 minuti prima ----
 const LEADS = [15, 30];     // minuti prima dell'inizio, dal più vicino al più lontano
 const ESCALATE_MS = 60000;  // se non confermi entro 1 minuto compare il popup
+const NAG_MS = 5 * 60000;   // con "insistenti" attivo, l'avviso si ripete ogni 5 minuti
+const SNOOZE_MIN = 10;      // "Dopo 10 min"
 const minsLeft = (i, now) => Math.max(1, Math.round((start(i) - now) / 60000));
 // Riarma i promemoria: le soglie già superate al momento dell'inserimento o dello spostamento vengono saltate
 function armReminders(i) {
   const ms = start(i) - new Date();
-  i.n1 = 0; i.n2 = 0; delete i.rem;
+  i.n1 = 0; i.n2 = 0; delete i.rem; delete i.snz;
   i.rf = LEADS.filter(l => ms < l * 60000);
 }
 const pending = now => items.filter(i => i.status === 'open' && i.rem && start(i) > now);
 function ack(i) { delete i.rem; save(); render(); }
+function snooze(i) { delete i.rem; i.snz = Date.now() + SNOOZE_MIN * 60000; save(); render(); }
 function fireReminder(i, lead, now) {
   i.rf = Array.from(new Set((i.rf || []).concat(LEADS.filter(l => l >= lead))));
   i.rem = { lead, at: +now };
@@ -330,18 +612,21 @@ function remBanner(i, now) {
   const g = el('div', 'grow'); g.style.cursor = 'default';
   g.append(el('div', 't', '⏰ Tra ' + minsLeft(i, now) + ' min: ' + i.title), el('div', 'sub', 'Alle ' + i.time));
   const ok = el('button', 'btn', 'Ok'); ok.onclick = () => ack(i);
+  const sn = el('button', 'btn', 'Dopo ' + SNOOZE_MIN + ' min'); sn.onclick = () => snooze(i);
   const mv = el('button', 'btn', 'Sposta'); mv.onclick = () => { ack(i); openDlg(i); };
-  c.append(g, ok, mv);
+  c.append(g, ok, sn, mv);
   return c;
 }
 let shown = [];
 function remPopupRow(i, now) {
-  const c = el('div', 'card row');
-  const g = el('div', 'grow'); g.style.cursor = 'default';
-  g.append(el('div', 't', i.title), el('div', 'sub', 'Tra ' + minsLeft(i, now) + ' min · alle ' + i.time));
+  const c = el('div', 'card');
+  c.append(el('div', 't', i.title), el('div', 'sub', 'Tra ' + minsLeft(i, now) + ' min · alle ' + i.time));
+  const a = el('div', 'acts'); a.style.marginTop = '8px';
+  const sn = el('button', 'btn ghost', 'Dopo ' + SNOOZE_MIN + ' min'); sn.type = 'button';
+  sn.onclick = () => { snooze(i); };
   const mv = el('button', 'btn ghost', 'Sposta'); mv.type = 'button';
   mv.onclick = () => { ack(i); $('#remDlg').close(); openDlg(i); };
-  c.append(g, mv);
+  a.append(sn, mv); c.append(a);
   return c;
 }
 function ackShown() {
@@ -363,15 +648,28 @@ $('#remDlg').addEventListener('cancel', ackShown);
 
 function tick() {
   const now = new Date(); let ch = false;
-  for (const i of items) {
+  for (let k = 0; k < items.length; k++) { // il ciclo include anche le ripetizioni create durante il passaggio
+    const i = items[k];
     if (i.status !== 'open') continue;
     const ms = start(i) - now;
     if (ms > 0) {
       const lead = LEADS.find(l => ms <= l * 60000 && !(i.rf || []).includes(l));
       if (lead) { fireReminder(i, lead, now); ch = true; }
-    } else if (i.rem) { delete i.rem; ch = true; }
+      if (i.snz && Date.now() >= i.snz) {
+        delete i.snz; i.rem = { lead: 0, at: +now };
+        notify('Tra ' + minsLeft(i, now) + ' min: ' + i.title, 'Alle ' + i.time, 'slitta-' + i.id + '-snooze'); ch = true;
+      }
+      if (NAG && i.rem && now - (i.rem.last || i.rem.at) >= NAG_MS) {
+        if (document.hidden || !document.hasFocus()) notify('Ancora ' + minsLeft(i, now) + ' min: ' + i.title, 'Alle ' + i.time + ' · apri Slitta e conferma', 'slitta-' + i.id + '-' + (i.rem.lead || 'snooze'));
+        i.rem.last = +now; ch = true;
+      }
+    } else {
+      if (i.rem) { delete i.rem; ch = true; }
+      if (i.snz) { delete i.snz; ch = true; }
+    }
     if (!i.n1 && start(i) <= now && end(i) > now) { notify('Ora: ' + i.title, 'Inizia adesso', 'slitta-' + i.id + '-now'); i.n1 = 1; ch = true; }
     if (!i.n2 && end(i) <= now) { notify('Non fatto: ' + i.title, 'Apri Slitta per riprogrammarlo', 'slitta-' + i.id + '-late'); i.n2 = 1; ch = true; }
+    if (end(i) <= now && isRep(i) && !i.nx) { spawnNext(i); ch = true; }
   }
   if (ch) save();
   render();
